@@ -2,6 +2,12 @@
 name = "ssh-keys"
 version = "0.1.0"
 authors = ["Stephen Demos <stphndemos@gmail.com>"]
+description = "read and write OpenSSH public keys"
+documentation = "github.com/sdemos/ssh-keys"
+homepage = "github.com/sdemos/ssh-keys"
+repository = "github.com/sdemos/ssh-keys"
+readme = "README.md"
+keywords = ["ssh", "ssh-keys", "keys", "rsa"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
