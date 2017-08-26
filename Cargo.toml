@@ -1,0 +1,11 @@
+[package]
+name = "ssh-keys"
+version = "0.1.0"
+authors = ["Stephen Demos <stphndemos@gmail.com>"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+error-chain = "0.10"
+base64 = "0.6"
+byteorder = "1.1"
+openssl = "0.9.17"
