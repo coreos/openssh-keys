@@ -9,7 +9,6 @@ extern crate byteorder;
 extern crate crypto;
 #[macro_use]
 extern crate error_chain;
-extern crate openssl;
 
 error_chain! {
     foreign_links {
@@ -31,8 +30,6 @@ use byteorder::{WriteBytesExt, BigEndian, ByteOrder};
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-
-use openssl::rsa::Rsa;
 
 #[derive(Clone, Debug)]
 pub enum PublicKey {
@@ -84,12 +81,11 @@ impl PublicKey {
         }
     }
 
-    /// get an ssh public key from an openssl Rsa key
-    /// panics if for some reason the Rsa key doesn't have an e or n component
-    pub fn from_rsa(rsa: &Rsa) -> Self {
+    /// get an ssh public key from rsa components
+    pub fn from_rsa(e: Vec<u8>, n: Vec<u8>) -> Self {
         PublicKey::Rsa {
-            exponent: rsa.e().unwrap().to_vec(),
-            modulus: rsa.n().unwrap().to_vec(),
+            exponent: e,
+            modulus: n,
         }
     }
 
