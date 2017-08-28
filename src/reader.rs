@@ -39,7 +39,8 @@ impl<'a> Reader<'a> {
     }
 
     pub fn read_mpint(&mut self) -> Result<&'a [u8]> {
-        // mpints might have an extra byte of zeros at the start
+        // mpints might have an extra byte of zeros at the start.
+        // if there is, we can just ignore it, since the number is big-endian
         let bytes = self.read_bytes()?;
         if bytes[0] == 0 {
             Ok(&bytes[1..])

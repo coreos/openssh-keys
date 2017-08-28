@@ -53,6 +53,14 @@ impl PublicKey {
     /// parse takes a string and reads from it an ssh public key
     /// it uses the first part of the key to determine the keytype
     /// the format it expects is described here https://tools.ietf.org/html/rfc4253#section-6.6
+    ///
+    /// You can parse and output ssh keys like this
+    /// ```
+    /// let rsa_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcMCOEryBa8IkxXacjIawaQPp08hR5h7+4vZePZ7DByTG3tqKgZYRJ86BaR+4fmdikFoQjvLJVUmwniq3wixhkP7VLCbqip3YHzxXrzxkbPC3w3O1Bdmifwn9cb8RcZXfXncCsSu+h5XCtQ5BOi41Iit3d13gIe/rfXVDURmRanV6R7Voljxdjmp/zyReuzc2/w5SI6Boi4tmcUlxAI7sFuP1kA3pABDhPtc3TDgAcPUIBoDCoY8q2egI197UuvbgsW2qraUcuQxbMvJOMSFg2FQrE2bpEqC4CtBn7+HiJrkVOHjV7bvSv7jd1SuX5XqkwMCRtdMuRpJr7CyZoFL5n demos@anduin";
+    /// let key = PublicKey::parse(rsa_key).unwrap();
+    /// let out = key.to_string("demos@anduin");
+    /// assert_eq!(rsa_key, out);
+    /// ```
     pub fn parse(key: &str) -> Result<Self> {
         let mut parts = key.split_whitespace();
         let keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
@@ -91,6 +99,7 @@ impl PublicKey {
     }
 
     /// keytype returns the type of key in the format described by rfc4253
+    /// The output will be ssh-{type} where type is [rsa,ed25519,ecdsa,dsa]
     pub fn keytype(&self) -> &'static str {
         match *self {
             PublicKey::Rsa{..} => "ssh-rsa",
@@ -98,6 +107,10 @@ impl PublicKey {
     }
 
     /// data returns the data section of the key in the format described by rfc4253
+    /// the contents of the data section depend on the keytype. For RSA keys it
+    /// contains the keytype, exponent, and modulus in that order. Other types
+    /// have other data sections. This function doesn't base64 encode the data,
+    /// that task is left to the consumer of the output.
     pub fn data(&self) -> Vec<u8> {
         match *self {
             PublicKey::Rsa{ref exponent, ref modulus} => {
@@ -134,10 +147,8 @@ impl PublicKey {
 
     /// fingerprint returns a string representing the fingerprint of the ssh key
     /// the format of the fingerprint is described tersely in
-    /// https://tools.ietf.org/html/rfc4716#page-6, but in particular, this
-    /// implementation tends towards the concrete behavior used by the openssh
-    /// implementation itself https://github.com/openssh/openssh-portable/blob/master/ssh-keygen.c#L842
-    /// right now it just sticks with the defaults of a base64 encoded SHA256 hash
+    /// https://tools.ietf.org/html/rfc4716#page-6. This uses the ssh-keygen
+    /// defaults of a base64 encoded SHA256 hash.
     pub fn fingerprint(&self) -> String {
         let data = self.data();
         let mut hasher = Sha256::new();
@@ -145,8 +156,8 @@ impl PublicKey {
         let mut hashed: [u8; 32] = [0; 32];
         hasher.result(&mut hashed);
         let mut fingerprint = base64::encode(&hashed);
-        // trim padding characters off the end
-        // not clear on exactly what this is doing but they do it here
+        // trim padding characters off the end. I'm not clear on exactly what
+        // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
         match fingerprint.find('=') {
             Some(l) => { fingerprint.split_off(l); },
@@ -155,6 +166,11 @@ impl PublicKey {
         format!("SHA256:{}", fingerprint)
     }
 
+    /// to_fingerprint_string prints out the fingerprint in the same format used
+    /// by `ssh-keygen -l -f key`, specifically the implementation here -
+    /// https://github.com/openssh/openssh-portable/blob/master/ssh-keygen.c#L842
+    /// right now it just sticks with the defaults of a base64 encoded SHA256
+    /// hash.
     pub fn to_fingerprint_string(&self) -> String {
         let keytype = match *self {
             PublicKey::Rsa{..} => "RSA",
