@@ -39,14 +39,23 @@ use crypto::sha2::Sha256;
 use reader::Reader;
 use writer::Writer;
 
+const SSH_RSA: &'static str = "ssh-rsa";
+
 /// PublicKey is the enum representation of a public key
 /// currently it only supports holding RSA public keys
 #[derive(Clone, Debug)]
-pub enum PublicKey {
+pub enum Data {
     Rsa {
         exponent: Vec<u8>,
         modulus: Vec<u8>,
     },
+}
+
+#[derive(Clone, Debug)]
+pub struct PublicKey {
+    keytype: &'static str,
+    data: Data,
+    comment: Option<String>,
 }
 
 impl PublicKey {
@@ -58,52 +67,69 @@ impl PublicKey {
     /// ```
     /// let rsa_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcMCOEryBa8IkxXacjIawaQPp08hR5h7+4vZePZ7DByTG3tqKgZYRJ86BaR+4fmdikFoQjvLJVUmwniq3wixhkP7VLCbqip3YHzxXrzxkbPC3w3O1Bdmifwn9cb8RcZXfXncCsSu+h5XCtQ5BOi41Iit3d13gIe/rfXVDURmRanV6R7Voljxdjmp/zyReuzc2/w5SI6Boi4tmcUlxAI7sFuP1kA3pABDhPtc3TDgAcPUIBoDCoY8q2egI197UuvbgsW2qraUcuQxbMvJOMSFg2FQrE2bpEqC4CtBn7+HiJrkVOHjV7bvSv7jd1SuX5XqkwMCRtdMuRpJr7CyZoFL5n demos@anduin";
     /// let key = PublicKey::parse(rsa_key).unwrap();
-    /// let out = key.to_string("demos@anduin");
+    /// let out = key.to_string();
     /// assert_eq!(rsa_key, out);
     /// ```
+    ///
+    /// parse somewhat attempts to keep track of comments, but it doesn't fully
+    /// comply with the rfc in that regard.
     pub fn parse(key: &str) -> Result<Self> {
         let mut parts = key.split_whitespace();
-        let keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
+        let in_keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
         let data = parts.next().ok_or(ErrorKind::InvalidFormat)?;
+        // comment is not required. if we get an empty comment (because of a
+        // trailing space) throw it out.
+        let comment = parts.next().and_then(|c| if c.is_empty() { None } else { Some(c.to_string()) });
 
         let buf = base64::decode(data)
             .chain_err(|| ErrorKind::InvalidFormat)?;
         let mut reader = Reader::new(&buf);
         let data_keytype = reader.read_string()?;
-        if keytype != data_keytype {
+        if in_keytype != data_keytype {
             return Err(ErrorKind::InvalidFormat.into());
         }
 
-        match keytype {
-            "ssh-rsa" => {
+        let keytype: &'static str;
+
+        let data = match in_keytype {
+            SSH_RSA => {
                 // the data for an rsa key consists of three pieces:
                 //    ssh-rsa public-exponent modulus
                 // see ssh-rsa format in https://tools.ietf.org/html/rfc4253#section-6.6
+                keytype = SSH_RSA;
                 let e = reader.read_mpint()?;
                 let n = reader.read_mpint()?;
-                Ok(PublicKey::Rsa {
+                Data::Rsa {
                     exponent: e.into(),
                     modulus: n.into(),
-                })
+                }
             },
-            _ => Err(ErrorKind::UnsupportedKeytype(keytype.into()).into()),
-        }
+            _ => return Err(ErrorKind::UnsupportedKeytype(in_keytype.into()).into()),
+        };
+
+        Ok(PublicKey {
+            keytype: keytype,
+            data: data,
+            comment: comment,
+        })
     }
 
     /// get an ssh public key from rsa components
     pub fn from_rsa(e: Vec<u8>, n: Vec<u8>) -> Self {
-        PublicKey::Rsa {
-            exponent: e,
-            modulus: n,
+        PublicKey {
+            keytype: SSH_RSA,
+            data: Data::Rsa {
+                exponent: e,
+                modulus: n,
+            },
+            comment: None,
         }
     }
 
     /// keytype returns the type of key in the format described by rfc4253
     /// The output will be ssh-{type} where type is [rsa,ed25519,ecdsa,dsa]
     pub fn keytype(&self) -> &'static str {
-        match *self {
-            PublicKey::Rsa{..} => "ssh-rsa",
-        }
+        self.keytype
     }
 
     /// data returns the data section of the key in the format described by rfc4253
@@ -112,18 +138,22 @@ impl PublicKey {
     /// have other data sections. This function doesn't base64 encode the data,
     /// that task is left to the consumer of the output.
     pub fn data(&self) -> Vec<u8> {
-        match *self {
-            PublicKey::Rsa{ref exponent, ref modulus} => {
+        let mut writer = Writer::new();
+        writer.write_string(self.keytype);
+        match self.data {
+            Data::Rsa{ref exponent, ref modulus} => {
                 // the data for an rsa key consists of three pieces:
                 //    ssh-rsa public-exponent modulus
                 // see ssh-rsa format in https://tools.ietf.org/html/rfc4253#section-6.6
-                let mut writer = Writer::new();
-                writer.write_string(self.keytype());
                 writer.write_mpint(exponent.clone());
                 writer.write_mpint(modulus.clone());
-                writer.to_vec()
             }
         }
+        writer.to_vec()
+    }
+
+    pub fn set_comment(&mut self, comment: &str) {
+        self.comment = Some(comment.to_string());
     }
 
     /// to_string returns a string representation of the ssh key
@@ -133,15 +163,15 @@ impl PublicKey {
     ///    ssh-keytype data comment
     /// each of those is encoded as big-endian bytes preceeded by four bytes
     /// representing their length.
-    pub fn to_string(self, comment: &str) -> String {
-        format!("{} {} {}", self.keytype(), base64::encode(&self.data()), comment)
+    pub fn to_string(self) -> String {
+        format!("{} {} {}", self.keytype, base64::encode(&self.data()), self.comment.unwrap_or_default())
     }
 
     /// size returns the size of the stored ssh key
     /// for rsa keys this is determined by the number of bits in the modulus
     pub fn size(&self) -> usize {
-        match *self {
-            PublicKey::Rsa{ref modulus,..} => modulus.len()*8,
+        match self.data {
+            Data::Rsa{ref modulus,..} => modulus.len()*8,
         }
     }
 
@@ -172,11 +202,11 @@ impl PublicKey {
     /// right now it just sticks with the defaults of a base64 encoded SHA256
     /// hash.
     pub fn to_fingerprint_string(&self) -> String {
-        let keytype = match *self {
-            PublicKey::Rsa{..} => "RSA",
+        let keytype = match self.data {
+            Data::Rsa{..} => "RSA",
         };
 
-        format!("{} {} {} ({})", self.size(), self.fingerprint(), "no comment", keytype)
+        format!("{} {} {} ({})", self.size(), self.fingerprint(), self.comment.clone().unwrap_or("no comment".to_string()), keytype)
     }
 }
 
@@ -185,11 +215,12 @@ mod tests {
     use super::*;
 
     const TEST_RSA_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcMCOEryBa8IkxXacjIawaQPp08hR5h7+4vZePZ7DByTG3tqKgZYRJ86BaR+4fmdikFoQjvLJVUmwniq3wixhkP7VLCbqip3YHzxXrzxkbPC3w3O1Bdmifwn9cb8RcZXfXncCsSu+h5XCtQ5BOi41Iit3d13gIe/rfXVDURmRanV6R7Voljxdjmp/zyReuzc2/w5SI6Boi4tmcUlxAI7sFuP1kA3pABDhPtc3TDgAcPUIBoDCoY8q2egI197UuvbgsW2qraUcuQxbMvJOMSFg2FQrE2bpEqC4CtBn7+HiJrkVOHjV7bvSv7jd1SuX5XqkwMCRtdMuRpJr7CyZoFL5n demos@anduin";
+    const TEST_RSA_COMMENT_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcMCOEryBa8IkxXacjIawaQPp08hR5h7+4vZePZ7DByTG3tqKgZYRJ86BaR+4fmdikFoQjvLJVUmwniq3wixhkP7VLCbqip3YHzxXrzxkbPC3w3O1Bdmifwn9cb8RcZXfXncCsSu+h5XCtQ5BOi41Iit3d13gIe/rfXVDURmRanV6R7Voljxdjmp/zyReuzc2/w5SI6Boi4tmcUlxAI7sFuP1kA3pABDhPtc3TDgAcPUIBoDCoY8q2egI197UuvbgsW2qraUcuQxbMvJOMSFg2FQrE2bpEqC4CtBn7+HiJrkVOHjV7bvSv7jd1SuX5XqkwMCRtdMuRpJr7CyZoFL5n test";
 
     #[test]
     fn rsa_parse_to_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        let out = key.to_string("demos@anduin");
+        let out = key.to_string();
         assert_eq!(TEST_RSA_KEY, out);
     }
 
@@ -214,6 +245,14 @@ mod tests {
     #[test]
     fn rsa_fingerprint_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("2048 SHA256:96eJ3PXgBcuIcwLllSxpHcv8Ewie6oev60Pkmu3pDE8 no comment (RSA)", key.to_fingerprint_string());
+        assert_eq!("2048 SHA256:96eJ3PXgBcuIcwLllSxpHcv8Ewie6oev60Pkmu3pDE8 demos@anduin (RSA)", key.to_fingerprint_string());
+    }
+
+    #[test]
+    fn rsa_set_comment() {
+        let mut key = PublicKey::parse(TEST_RSA_KEY).unwrap();
+        key.set_comment("test");
+        let out = key.to_string();
+        assert_eq!(TEST_RSA_COMMENT_KEY, out);
     }
 }
