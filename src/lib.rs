@@ -39,6 +39,8 @@ use crypto::sha2::Sha256;
 use reader::Reader;
 use writer::Writer;
 
+use std::fmt;
+
 const SSH_RSA: &'static str = "ssh-rsa";
 
 /// PublicKey is the enum representation of a public key
@@ -56,6 +58,12 @@ pub struct PublicKey {
     keytype: &'static str,
     data: Data,
     comment: Option<String>,
+}
+
+impl fmt::Display for PublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_key_file())
+    }
 }
 
 impl PublicKey {
@@ -163,8 +171,8 @@ impl PublicKey {
     ///    ssh-keytype data comment
     /// each of those is encoded as big-endian bytes preceeded by four bytes
     /// representing their length.
-    pub fn to_string(self) -> String {
-        format!("{} {} {}", self.keytype, base64::encode(&self.data()), self.comment.unwrap_or_default())
+    pub fn to_key_file(&self) -> String {
+        format!("{} {} {}", self.keytype, base64::encode(&self.data()), self.comment.clone().unwrap_or_default())
     }
 
     /// size returns the size of the stored ssh key
