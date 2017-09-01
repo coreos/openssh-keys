@@ -42,6 +42,7 @@ use writer::Writer;
 use std::fmt;
 
 const SSH_RSA: &'static str = "ssh-rsa";
+const SSH_DSA: &'static str = "ssh-dss";
 
 /// PublicKey is the enum representation of a public key
 /// currently it only supports holding RSA public keys
@@ -50,6 +51,12 @@ pub enum Data {
     Rsa {
         exponent: Vec<u8>,
         modulus: Vec<u8>,
+    },
+    Dsa {
+        p: Vec<u8>,
+        q: Vec<u8>,
+        g: Vec<u8>,
+        pub_key: Vec<u8>,
     },
 }
 
@@ -112,6 +119,27 @@ impl PublicKey {
                     modulus: n.into(),
                 }
             },
+            SSH_DSA => {
+                // the data stored for a dsa key is, in order
+                //    ssh-dsa p q g public-key
+                // p and q are primes
+                // g = h^((p-1)/q) where 1 < h < p-1
+                // public-key is the value that is actually generated in
+                // relation to the secret key
+                // see https://en.wikipedia.org/wiki/Digital_Signature_Algorithm
+                // and https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L743
+                keytype = SSH_DSA;
+                let p = reader.read_mpint()?;
+                let q = reader.read_mpint()?;
+                let g = reader.read_mpint()?;
+                let pub_key = reader.read_mpint()?;
+                Data::Dsa {
+                    p: p.into(),
+                    q: q.into(),
+                    g: g.into(),
+                    pub_key: pub_key.into(),
+                }
+            }
             _ => return Err(ErrorKind::UnsupportedKeytype(in_keytype.into()).into()),
         };
 
@@ -129,6 +157,19 @@ impl PublicKey {
             data: Data::Rsa {
                 exponent: e,
                 modulus: n,
+            },
+            comment: None,
+        }
+    }
+
+    pub fn from_dsa(p: Vec<u8>, q: Vec<u8>, g: Vec<u8>, pkey: Vec<u8>) -> Self {
+        PublicKey {
+            keytype: SSH_DSA,
+            data: Data::Dsa {
+                p: p,
+                q: q,
+                g: g,
+                pub_key: pkey,
             },
             comment: None,
         }
@@ -156,6 +197,12 @@ impl PublicKey {
                 writer.write_mpint(exponent.clone());
                 writer.write_mpint(modulus.clone());
             }
+            Data::Dsa{ref p, ref q, ref g, ref pub_key} => {
+                writer.write_mpint(p.clone());
+                writer.write_mpint(q.clone());
+                writer.write_mpint(g.clone());
+                writer.write_mpint(pub_key.clone());
+            }
         }
         writer.to_vec()
     }
@@ -177,9 +224,12 @@ impl PublicKey {
 
     /// size returns the size of the stored ssh key
     /// for rsa keys this is determined by the number of bits in the modulus
+    /// for dsa keys it's the number of bits in the prime p
+    /// see https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L261
     pub fn size(&self) -> usize {
         match self.data {
             Data::Rsa{ref modulus,..} => modulus.len()*8,
+            Data::Dsa{ref p,..} => p.len()*8,
         }
     }
 
@@ -212,6 +262,7 @@ impl PublicKey {
     pub fn to_fingerprint_string(&self) -> String {
         let keytype = match self.data {
             Data::Rsa{..} => "RSA",
+            Data::Dsa{..} => "DSA",
         };
 
         format!("{} {} {} ({})", self.size(), self.fingerprint(), self.comment.clone().unwrap_or("no comment".to_string()), keytype)
@@ -222,8 +273,9 @@ impl PublicKey {
 mod tests {
     use super::*;
 
-    const TEST_RSA_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcMCOEryBa8IkxXacjIawaQPp08hR5h7+4vZePZ7DByTG3tqKgZYRJ86BaR+4fmdikFoQjvLJVUmwniq3wixhkP7VLCbqip3YHzxXrzxkbPC3w3O1Bdmifwn9cb8RcZXfXncCsSu+h5XCtQ5BOi41Iit3d13gIe/rfXVDURmRanV6R7Voljxdjmp/zyReuzc2/w5SI6Boi4tmcUlxAI7sFuP1kA3pABDhPtc3TDgAcPUIBoDCoY8q2egI197UuvbgsW2qraUcuQxbMvJOMSFg2FQrE2bpEqC4CtBn7+HiJrkVOHjV7bvSv7jd1SuX5XqkwMCRtdMuRpJr7CyZoFL5n demos@anduin";
-    const TEST_RSA_COMMENT_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcMCOEryBa8IkxXacjIawaQPp08hR5h7+4vZePZ7DByTG3tqKgZYRJ86BaR+4fmdikFoQjvLJVUmwniq3wixhkP7VLCbqip3YHzxXrzxkbPC3w3O1Bdmifwn9cb8RcZXfXncCsSu+h5XCtQ5BOi41Iit3d13gIe/rfXVDURmRanV6R7Voljxdjmp/zyReuzc2/w5SI6Boi4tmcUlxAI7sFuP1kA3pABDhPtc3TDgAcPUIBoDCoY8q2egI197UuvbgsW2qraUcuQxbMvJOMSFg2FQrE2bpEqC4CtBn7+HiJrkVOHjV7bvSv7jd1SuX5XqkwMCRtdMuRpJr7CyZoFL5n test";
+    const TEST_RSA_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCYH3vPUJThzriVlVKmKOg71EOVYm274oRa5KLWEoK0HmjMc9ru0j4ofouoeW/AVmRVujxfaIGR/8en/lUPkiv5DSeM6aXnDz5cExNptrAy/sMPLQhVALRrqQ+dkS9Ct/YA+A1Le5LPh4MJu79hCDLTwqSdKqDuUcYQzR0M7APslaDCR96zY+VUL4lKObUUd4wsP3opdTQ6G20qXEer14EPGr9N53S/u+JJGLoPlb1uPIH96oKY4t/SeLIRQsocdViRaiF/Aq7kPzWd/yCLVdXJSRt3CftboV4kLBHGteTS551J32MJoqjEi4Q/DucWYrQfx5H3qXVB+/G2HurKPIHL demos@siril";
+    const TEST_RSA_COMMENT_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCYH3vPUJThzriVlVKmKOg71EOVYm274oRa5KLWEoK0HmjMc9ru0j4ofouoeW/AVmRVujxfaIGR/8en/lUPkiv5DSeM6aXnDz5cExNptrAy/sMPLQhVALRrqQ+dkS9Ct/YA+A1Le5LPh4MJu79hCDLTwqSdKqDuUcYQzR0M7APslaDCR96zY+VUL4lKObUUd4wsP3opdTQ6G20qXEer14EPGr9N53S/u+JJGLoPlb1uPIH96oKY4t/SeLIRQsocdViRaiF/Aq7kPzWd/yCLVdXJSRt3CftboV4kLBHGteTS551J32MJoqjEi4Q/DucWYrQfx5H3qXVB+/G2HurKPIHL test";
+    const TEST_DSA_KEY: &'static str = "ssh-dss AAAAB3NzaC1kc3MAAACBAIkd9CkqldM2St8f53rfJT7kPgiA8leZaN7hdZd48hYJyKzVLoPdBMaGFuOwGjv0Im3JWqWAewANe0xeLceQL0rSFbM/mZV+1gc1nm1WmtVw4KJIlLXl3gS7NYfQ9Ith4wFnZd/xhRz9Q+MBsA1DgXew1zz4dLYI46KmFivJ7XDzAAAAFQC8z4VIhI4HlHTvB7FdwAfqWsvcOwAAAIBEqPIkW3HHDTSEhUhhV2AlIPNwI/bqaCXy2zYQ6iTT3oUh+N4xlRaBSvW+h2NC97U8cxd7Y0dXIbQKPzwNzRX1KA1F9WAuNzrx9KkpCg2TpqXShhp+Sseb+l6uJjthIYM6/0dvr9cBDMeExabPPgBo3Eii2NLbFSqIe86qav8hZAAAAIBk5AetZrG8varnzv1khkKh6Xq/nX9r1UgIOCQos2XOi2ErjlB9swYCzReo1RT7dalITVi7K9BtvJxbutQEOvN7JjJnPJs+M3OqRMMF+anXPdCWUIBxZUwctbkAD5joEjGDrNXHQEw9XixZ9p3wudbISnPFgZhS1sbS9Rlw5QogKg== demos@siril";
 
     #[test]
     fn rsa_parse_to_string() {
@@ -247,13 +299,13 @@ mod tests {
     #[test]
     fn rsa_fingerprint() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("SHA256:96eJ3PXgBcuIcwLllSxpHcv8Ewie6oev60Pkmu3pDE8", key.fingerprint());
+        assert_eq!("SHA256:YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o", key.fingerprint());
     }
 
     #[test]
     fn rsa_fingerprint_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("2048 SHA256:96eJ3PXgBcuIcwLllSxpHcv8Ewie6oev60Pkmu3pDE8 demos@anduin (RSA)", key.to_fingerprint_string());
+        assert_eq!("2048 SHA256:YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o demos@siril (RSA)", key.to_fingerprint_string());
     }
 
     #[test]
@@ -263,4 +315,36 @@ mod tests {
         let out = key.to_string();
         assert_eq!(TEST_RSA_COMMENT_KEY, out);
     }
+
+    #[test]
+    fn dsa_parse_to_string() {
+        let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
+        let out = key.to_string();
+        assert_eq!(TEST_DSA_KEY, out);
+    }
+
+    #[test]
+    fn dsa_size() {
+        let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
+        assert_eq!(1024, key.size());
+    }
+
+    #[test]
+    fn dsa_keytype() {
+        let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
+        assert_eq!("ssh-dss", key.keytype());
+    }
+
+    #[test]
+    fn dsa_fingerprint() {
+        let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
+        assert_eq!("SHA256:/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4", key.fingerprint());
+    }
+
+    #[test]
+    fn dsa_fingerprint_string() {
+        let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
+        assert_eq!("1024 SHA256:/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4 demos@siril (DSA)", key.to_fingerprint_string());
+    }
+
 }
