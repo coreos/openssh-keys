@@ -27,6 +27,10 @@ mod errors {
                 description("unsupported keytype")
                     display("unsupported keytype: {}", t)
             }
+            UnsupportedCurve(t: String) {
+                description("unsupported curve")
+                    display("unsupported curve: {}", t)
+            }
         }
     }
 }
@@ -44,6 +48,44 @@ use std::fmt;
 const SSH_RSA: &'static str = "ssh-rsa";
 const SSH_DSA: &'static str = "ssh-dss";
 const SSH_ED25519: &'static str = "ssh-ed25519";
+const SSH_ECDSA_256: &'static str = "ecdsa-sha2-nistp256";
+const SSH_ECDSA_384: &'static str = "ecdsa-sha2-nistp384";
+const SSH_ECDSA_521: &'static str = "ecdsa-sha2-nistp521";
+const NISTP_256: &'static str = "nistp256";
+const NISTP_384: &'static str = "nistp384";
+const NISTP_521: &'static str = "nistp521";
+
+/// Curves for ECDSA
+#[derive(Clone, Debug)]
+pub enum Curve {
+    Nistp256,
+    Nistp384,
+    Nistp521,
+}
+
+impl Curve {
+    fn get(curve: &str) -> Result<Self> {
+        Ok(match curve {
+            NISTP_256 => Curve::Nistp256,
+            NISTP_384 => Curve::Nistp384,
+            NISTP_521 => Curve::Nistp521,
+            _ => return Err(ErrorKind::UnsupportedCurve(curve.to_string()).into())
+        })
+    }
+    fn curvetype(&self) -> &'static str {
+        match *self {
+            Curve::Nistp256 => NISTP_256,
+            Curve::Nistp384 => NISTP_384,
+            Curve::Nistp521 => NISTP_521,
+        }
+    }
+}
+
+impl fmt::Display for Curve {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.curvetype())
+    }
+}
 
 /// PublicKey is the enum representation of a public key
 /// currently it only supports holding RSA public keys
@@ -60,6 +102,10 @@ pub enum Data {
         pub_key: Vec<u8>,
     },
     Ed25519 {
+        key: Vec<u8>,
+    },
+    Ecdsa {
+        curve: Curve,
         key: Vec<u8>,
     },
 }
@@ -138,7 +184,7 @@ impl PublicKey {
                     g: g.into(),
                     pub_key: pub_key.into(),
                 }
-            }
+            },
             SSH_ED25519 => {
                 // the data stored for an ed25519 is just the point on the curve
                 // or something
@@ -147,7 +193,31 @@ impl PublicKey {
                 Data::Ed25519 {
                     key: key.into(),
                 }
-            }
+            },
+            SSH_ECDSA_256 | SSH_ECDSA_384 | SSH_ECDSA_521 => {
+                // ecdsa is of the form
+                //    ecdsa-sha2-[identifier] [identifier] [data]
+                // the identifier is one of nistp256, nistp384, nistp521
+                // the data is some weird thing described in section 2.3.4 and
+                // 2.3.4 of https://www.secg.org/sec1-v2.pdf so for now we
+                // aren't going to bother actually computing it and instead we
+                // will just not let you construct them.
+                //
+                // see the data definition at
+                // https://tools.ietf.org/html/rfc5656#section-3.1
+                // and the openssh output
+                // https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L753
+                // and the openssh buffer writer implementation
+                // https://github.com/openssh/openssh-portable/blob/master/sshbuf-getput-crypto.c#L192
+                // and the openssl point2oct implementation
+                // https://github.com/openssl/openssl/blob/aa8f3d76fcf1502586435631be16faa1bef3cdf7/crypto/ec/ec_oct.c#L82
+                let curve = reader.read_string()?;
+                let key = reader.read_bytes()?;
+                Data::Ecdsa {
+                    curve: Curve::get(curve)?,
+                    key: key.into(),
+                }
+            },
             _ => return Err(ErrorKind::UnsupportedKeytype(keytype.into()).into()),
         };
 
@@ -198,6 +268,11 @@ impl PublicKey {
             Data::Rsa{..} => SSH_RSA,
             Data::Dsa{..} => SSH_DSA,
             Data::Ed25519{..} => SSH_ED25519,
+            Data::Ecdsa{ref curve,..} => match *curve {
+                Curve::Nistp256 => SSH_ECDSA_256,
+                Curve::Nistp384 => SSH_ECDSA_384,
+                Curve::Nistp521 => SSH_ECDSA_521,
+            },
         }
     }
 
@@ -225,6 +300,10 @@ impl PublicKey {
             }
             Data::Ed25519{ref key} => {
                 writer.write_mpint(key.clone());
+            }
+            Data::Ecdsa{ref curve, ref key} => {
+                writer.write_string(curve.curvetype());
+                writer.write_bytes(key.clone());
             }
         }
         writer.to_vec()
@@ -254,6 +333,11 @@ impl PublicKey {
             Data::Rsa{ref modulus,..} => modulus.len()*8,
             Data::Dsa{ref p,..} => p.len()*8,
             Data::Ed25519{..} => 256, // ??
+            Data::Ecdsa{ref curve,..} => match *curve {
+                Curve::Nistp256 => 256,
+                Curve::Nistp384 => 384,
+                Curve::Nistp521 => 521,
+            }
         }
     }
 
@@ -288,6 +372,7 @@ impl PublicKey {
             Data::Rsa{..} => "RSA",
             Data::Dsa{..} => "DSA",
             Data::Ed25519{..} => "ED25519",
+            Data::Ecdsa{..} => "ECDSA",
         };
 
         format!("{} {} {} ({})", self.size(), self.fingerprint(), self.comment.clone().unwrap_or("no comment".to_string()), keytype)
@@ -302,6 +387,7 @@ mod tests {
     const TEST_RSA_COMMENT_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCYH3vPUJThzriVlVKmKOg71EOVYm274oRa5KLWEoK0HmjMc9ru0j4ofouoeW/AVmRVujxfaIGR/8en/lUPkiv5DSeM6aXnDz5cExNptrAy/sMPLQhVALRrqQ+dkS9Ct/YA+A1Le5LPh4MJu79hCDLTwqSdKqDuUcYQzR0M7APslaDCR96zY+VUL4lKObUUd4wsP3opdTQ6G20qXEer14EPGr9N53S/u+JJGLoPlb1uPIH96oKY4t/SeLIRQsocdViRaiF/Aq7kPzWd/yCLVdXJSRt3CftboV4kLBHGteTS551J32MJoqjEi4Q/DucWYrQfx5H3qXVB+/G2HurKPIHL test";
     const TEST_DSA_KEY: &'static str = "ssh-dss AAAAB3NzaC1kc3MAAACBAIkd9CkqldM2St8f53rfJT7kPgiA8leZaN7hdZd48hYJyKzVLoPdBMaGFuOwGjv0Im3JWqWAewANe0xeLceQL0rSFbM/mZV+1gc1nm1WmtVw4KJIlLXl3gS7NYfQ9Ith4wFnZd/xhRz9Q+MBsA1DgXew1zz4dLYI46KmFivJ7XDzAAAAFQC8z4VIhI4HlHTvB7FdwAfqWsvcOwAAAIBEqPIkW3HHDTSEhUhhV2AlIPNwI/bqaCXy2zYQ6iTT3oUh+N4xlRaBSvW+h2NC97U8cxd7Y0dXIbQKPzwNzRX1KA1F9WAuNzrx9KkpCg2TpqXShhp+Sseb+l6uJjthIYM6/0dvr9cBDMeExabPPgBo3Eii2NLbFSqIe86qav8hZAAAAIBk5AetZrG8varnzv1khkKh6Xq/nX9r1UgIOCQos2XOi2ErjlB9swYCzReo1RT7dalITVi7K9BtvJxbutQEOvN7JjJnPJs+M3OqRMMF+anXPdCWUIBxZUwctbkAD5joEjGDrNXHQEw9XixZ9p3wudbISnPFgZhS1sbS9Rlw5QogKg== demos@siril";
     const TEST_ED25519_KEY: &'static str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril";
+    const TEST_ECDSA256_KEY: &'static str = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBIhfLQrww4DlhYzbSWXoX3ctOQ0jVosvfHfW+QWVotksbPzM2YgkIikTpoHUfZrYpJKWx7WYs5aqeLkdCDdk+jk= demos@siril";
 
     #[test]
     fn rsa_parse_to_string() {
@@ -402,5 +488,36 @@ mod tests {
     fn ed25519_fingerprint_string() {
         let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
         assert_eq!("256 SHA256:A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI demos@siril (ED25519)", key.to_fingerprint_string());
+    }
+
+    #[test]
+    fn ecdsa256_parse_to_string() {
+        let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
+        let out = key.to_string();
+        assert_eq!(TEST_ECDSA256_KEY, out);
+    }
+
+    #[test]
+    fn ecdsa256_size() {
+        let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
+        assert_eq!(256, key.size());
+    }
+
+    #[test]
+    fn ecdsa256_keytype() {
+        let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
+        assert_eq!("ecdsa-sha2-nistp256", key.keytype());
+    }
+
+    #[test]
+    fn ecdsa256_fingerprint() {
+        let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
+        assert_eq!("SHA256:BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs", key.fingerprint());
+    }
+
+    #[test]
+    fn ecdsa256_fingerprint_string() {
+        let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
+        assert_eq!("256 SHA256:BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs demos@siril (ECDSA)", key.to_fingerprint_string());
     }
 }
