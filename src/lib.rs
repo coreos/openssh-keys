@@ -43,6 +43,7 @@ use std::fmt;
 
 const SSH_RSA: &'static str = "ssh-rsa";
 const SSH_DSA: &'static str = "ssh-dss";
+const SSH_ED25519: &'static str = "ssh-ed25519";
 
 /// PublicKey is the enum representation of a public key
 /// currently it only supports holding RSA public keys
@@ -57,6 +58,9 @@ pub enum Data {
         q: Vec<u8>,
         g: Vec<u8>,
         pub_key: Vec<u8>,
+    },
+    Ed25519 {
+        key: Vec<u8>,
     },
 }
 
@@ -140,6 +144,16 @@ impl PublicKey {
                     pub_key: pub_key.into(),
                 }
             }
+            SSH_ED25519 => {
+                // the data stored for an ed25519 is just the point on the curve
+                // or something
+                // see https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L772
+                keytype = SSH_ED25519;
+                let key = reader.read_mpint()?;
+                Data::Ed25519 {
+                    key: key.into(),
+                }
+            }
             _ => return Err(ErrorKind::UnsupportedKeytype(in_keytype.into()).into()),
         };
 
@@ -162,6 +176,7 @@ impl PublicKey {
         }
     }
 
+    /// get an ssh public key from dsa components
     pub fn from_dsa(p: Vec<u8>, q: Vec<u8>, g: Vec<u8>, pkey: Vec<u8>) -> Self {
         PublicKey {
             keytype: SSH_DSA,
@@ -170,6 +185,17 @@ impl PublicKey {
                 q: q,
                 g: g,
                 pub_key: pkey,
+            },
+            comment: None,
+        }
+    }
+
+    /// get an ssh public key from an ed25519 point (probably)
+    pub fn from_ed25519(key: Vec<u8>) -> Self {
+        PublicKey {
+            keytype: SSH_ED25519,
+            data: Data::Ed25519 {
+                key: key,
             },
             comment: None,
         }
@@ -203,6 +229,9 @@ impl PublicKey {
                 writer.write_mpint(g.clone());
                 writer.write_mpint(pub_key.clone());
             }
+            Data::Ed25519{ref key} => {
+                writer.write_mpint(key.clone());
+            }
         }
         writer.to_vec()
     }
@@ -230,6 +259,7 @@ impl PublicKey {
         match self.data {
             Data::Rsa{ref modulus,..} => modulus.len()*8,
             Data::Dsa{ref p,..} => p.len()*8,
+            Data::Ed25519{ref key} => 256, // ??
         }
     }
 
@@ -263,6 +293,7 @@ impl PublicKey {
         let keytype = match self.data {
             Data::Rsa{..} => "RSA",
             Data::Dsa{..} => "DSA",
+            Data::Ed25519{..} => "ED25519",
         };
 
         format!("{} {} {} ({})", self.size(), self.fingerprint(), self.comment.clone().unwrap_or("no comment".to_string()), keytype)
@@ -276,6 +307,7 @@ mod tests {
     const TEST_RSA_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCYH3vPUJThzriVlVKmKOg71EOVYm274oRa5KLWEoK0HmjMc9ru0j4ofouoeW/AVmRVujxfaIGR/8en/lUPkiv5DSeM6aXnDz5cExNptrAy/sMPLQhVALRrqQ+dkS9Ct/YA+A1Le5LPh4MJu79hCDLTwqSdKqDuUcYQzR0M7APslaDCR96zY+VUL4lKObUUd4wsP3opdTQ6G20qXEer14EPGr9N53S/u+JJGLoPlb1uPIH96oKY4t/SeLIRQsocdViRaiF/Aq7kPzWd/yCLVdXJSRt3CftboV4kLBHGteTS551J32MJoqjEi4Q/DucWYrQfx5H3qXVB+/G2HurKPIHL demos@siril";
     const TEST_RSA_COMMENT_KEY: &'static str = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCYH3vPUJThzriVlVKmKOg71EOVYm274oRa5KLWEoK0HmjMc9ru0j4ofouoeW/AVmRVujxfaIGR/8en/lUPkiv5DSeM6aXnDz5cExNptrAy/sMPLQhVALRrqQ+dkS9Ct/YA+A1Le5LPh4MJu79hCDLTwqSdKqDuUcYQzR0M7APslaDCR96zY+VUL4lKObUUd4wsP3opdTQ6G20qXEer14EPGr9N53S/u+JJGLoPlb1uPIH96oKY4t/SeLIRQsocdViRaiF/Aq7kPzWd/yCLVdXJSRt3CftboV4kLBHGteTS551J32MJoqjEi4Q/DucWYrQfx5H3qXVB+/G2HurKPIHL test";
     const TEST_DSA_KEY: &'static str = "ssh-dss AAAAB3NzaC1kc3MAAACBAIkd9CkqldM2St8f53rfJT7kPgiA8leZaN7hdZd48hYJyKzVLoPdBMaGFuOwGjv0Im3JWqWAewANe0xeLceQL0rSFbM/mZV+1gc1nm1WmtVw4KJIlLXl3gS7NYfQ9Ith4wFnZd/xhRz9Q+MBsA1DgXew1zz4dLYI46KmFivJ7XDzAAAAFQC8z4VIhI4HlHTvB7FdwAfqWsvcOwAAAIBEqPIkW3HHDTSEhUhhV2AlIPNwI/bqaCXy2zYQ6iTT3oUh+N4xlRaBSvW+h2NC97U8cxd7Y0dXIbQKPzwNzRX1KA1F9WAuNzrx9KkpCg2TpqXShhp+Sseb+l6uJjthIYM6/0dvr9cBDMeExabPPgBo3Eii2NLbFSqIe86qav8hZAAAAIBk5AetZrG8varnzv1khkKh6Xq/nX9r1UgIOCQos2XOi2ErjlB9swYCzReo1RT7dalITVi7K9BtvJxbutQEOvN7JjJnPJs+M3OqRMMF+anXPdCWUIBxZUwctbkAD5joEjGDrNXHQEw9XixZ9p3wudbISnPFgZhS1sbS9Rlw5QogKg== demos@siril";
+    const TEST_ED25519_KEY: &'static str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril";
 
     #[test]
     fn rsa_parse_to_string() {
@@ -347,4 +379,34 @@ mod tests {
         assert_eq!("1024 SHA256:/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4 demos@siril (DSA)", key.to_fingerprint_string());
     }
 
+    #[test]
+    fn ed25519_parse_to_string() {
+        let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
+        let out = key.to_string();
+        assert_eq!(TEST_ED25519_KEY, out);
+    }
+
+    #[test]
+    fn ed25519_size() {
+        let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
+        assert_eq!(256, key.size());
+    }
+
+    #[test]
+    fn ed25519_keytype() {
+        let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
+        assert_eq!("ssh-ed25519", key.keytype());
+    }
+
+    #[test]
+    fn ed25519_fingerprint() {
+        let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
+        assert_eq!("SHA256:A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI", key.fingerprint());
+    }
+
+    #[test]
+    fn ed25519_fingerprint_string() {
+        let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
+        assert_eq!("256 SHA256:A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI demos@siril (ED25519)", key.to_fingerprint_string());
+    }
 }
