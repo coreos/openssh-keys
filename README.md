@@ -2,7 +2,15 @@
 
 `ssh-keys` can parse, print, and fingerprint OpenSSH public keys in pure rust.
 
-Currently, `ssh-keys` only supports RSA public keys. 
+`ssh-keys` supports the following algorithms:
+
+* RSA
+* DSA
+* ECDSA (nistp256, nistp384, nistp521)
+* ED25519
+
+It can construct RSA and DSA keys from their components using the `from_rsa` and
+`from_dsa` functions respectively.
 
 ## License
 
