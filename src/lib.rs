@@ -1,7 +1,13 @@
 //! ssh-keys
 //!
-//! this library provides pure-rust parsing, manipulation, and validation of
-//! ssh keys. it provides a struct for encapsulation of ssh keys in projects.
+//! this library provides pure-rust parsing, manipulation, and some basic
+//! validation of ssh keys. it provides a struct for encapsulation of ssh keys
+//! in projects.
+//!
+//! ssh-keys doesn't have the ability to generate ssh-keys. however, it does
+//! allow you to construct rsa and dsa keys from their components, so if you
+//! generate the keys with another library (say, rust-openssl), then you can
+//! output the ssh public keys with this library.
 #![allow(unused_doc_comment)]
 
 extern crate base64;
@@ -63,7 +69,11 @@ pub enum Curve {
     Nistp521,
 }
 
+
 impl Curve {
+    /// get converts a curve name of the type in the format described in
+    /// https://tools.ietf.org/html/rfc5656#section-10 and returns a curve
+    /// object.
     fn get(curve: &str) -> Result<Self> {
         Ok(match curve {
             NISTP_256 => Curve::Nistp256,
@@ -72,6 +82,9 @@ impl Curve {
             _ => return Err(ErrorKind::UnsupportedCurve(curve.to_string()).into())
         })
     }
+
+    /// curvetype gets the curve name in the format described in
+    /// https://tools.ietf.org/html/rfc5656#section-10
     fn curvetype(&self) -> &'static str {
         match *self {
             Curve::Nistp256 => NISTP_256,
@@ -87,8 +100,8 @@ impl fmt::Display for Curve {
     }
 }
 
-/// PublicKey is the enum representation of a public key
-/// currently it only supports holding RSA public keys
+/// Data is the representation of the data section of an ssh public key. it is
+/// an enum with all the different supported key algorithms.
 #[derive(Clone, Debug)]
 pub enum Data {
     Rsa {
@@ -110,6 +123,7 @@ pub enum Data {
     },
 }
 
+/// PublicKey is the struct representation of an ssh public key.
 #[derive(Clone, Debug)]
 pub struct PublicKey {
     data: Data,
