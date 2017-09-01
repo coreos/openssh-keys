@@ -66,7 +66,6 @@ pub enum Data {
 
 #[derive(Clone, Debug)]
 pub struct PublicKey {
-    keytype: &'static str,
     data: Data,
     comment: Option<String>,
 }
@@ -94,7 +93,7 @@ impl PublicKey {
     /// comply with the rfc in that regard.
     pub fn parse(key: &str) -> Result<Self> {
         let mut parts = key.split_whitespace();
-        let in_keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
+        let keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
         let data = parts.next().ok_or(ErrorKind::InvalidFormat)?;
         // comment is not required. if we get an empty comment (because of a
         // trailing space) throw it out.
@@ -104,18 +103,15 @@ impl PublicKey {
             .chain_err(|| ErrorKind::InvalidFormat)?;
         let mut reader = Reader::new(&buf);
         let data_keytype = reader.read_string()?;
-        if in_keytype != data_keytype {
+        if keytype != data_keytype {
             return Err(ErrorKind::InvalidFormat.into());
         }
 
-        let keytype: &'static str;
-
-        let data = match in_keytype {
+        let data = match keytype {
             SSH_RSA => {
                 // the data for an rsa key consists of three pieces:
                 //    ssh-rsa public-exponent modulus
                 // see ssh-rsa format in https://tools.ietf.org/html/rfc4253#section-6.6
-                keytype = SSH_RSA;
                 let e = reader.read_mpint()?;
                 let n = reader.read_mpint()?;
                 Data::Rsa {
@@ -132,7 +128,6 @@ impl PublicKey {
                 // relation to the secret key
                 // see https://en.wikipedia.org/wiki/Digital_Signature_Algorithm
                 // and https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L743
-                keytype = SSH_DSA;
                 let p = reader.read_mpint()?;
                 let q = reader.read_mpint()?;
                 let g = reader.read_mpint()?;
@@ -148,17 +143,15 @@ impl PublicKey {
                 // the data stored for an ed25519 is just the point on the curve
                 // or something
                 // see https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L772
-                keytype = SSH_ED25519;
                 let key = reader.read_mpint()?;
                 Data::Ed25519 {
                     key: key.into(),
                 }
             }
-            _ => return Err(ErrorKind::UnsupportedKeytype(in_keytype.into()).into()),
+            _ => return Err(ErrorKind::UnsupportedKeytype(keytype.into()).into()),
         };
 
         Ok(PublicKey {
-            keytype: keytype,
             data: data,
             comment: comment,
         })
@@ -167,7 +160,6 @@ impl PublicKey {
     /// get an ssh public key from rsa components
     pub fn from_rsa(e: Vec<u8>, n: Vec<u8>) -> Self {
         PublicKey {
-            keytype: SSH_RSA,
             data: Data::Rsa {
                 exponent: e,
                 modulus: n,
@@ -179,7 +171,6 @@ impl PublicKey {
     /// get an ssh public key from dsa components
     pub fn from_dsa(p: Vec<u8>, q: Vec<u8>, g: Vec<u8>, pkey: Vec<u8>) -> Self {
         PublicKey {
-            keytype: SSH_DSA,
             data: Data::Dsa {
                 p: p,
                 q: q,
@@ -193,7 +184,6 @@ impl PublicKey {
     /// get an ssh public key from an ed25519 point (probably)
     pub fn from_ed25519(key: Vec<u8>) -> Self {
         PublicKey {
-            keytype: SSH_ED25519,
             data: Data::Ed25519 {
                 key: key,
             },
@@ -204,7 +194,11 @@ impl PublicKey {
     /// keytype returns the type of key in the format described by rfc4253
     /// The output will be ssh-{type} where type is [rsa,ed25519,ecdsa,dsa]
     pub fn keytype(&self) -> &'static str {
-        self.keytype
+        match self.data {
+            Data::Rsa{..} => SSH_RSA,
+            Data::Dsa{..} => SSH_DSA,
+            Data::Ed25519{..} => SSH_ED25519,
+        }
     }
 
     /// data returns the data section of the key in the format described by rfc4253
@@ -214,7 +208,7 @@ impl PublicKey {
     /// that task is left to the consumer of the output.
     pub fn data(&self) -> Vec<u8> {
         let mut writer = Writer::new();
-        writer.write_string(self.keytype);
+        writer.write_string(self.keytype());
         match self.data {
             Data::Rsa{ref exponent, ref modulus} => {
                 // the data for an rsa key consists of three pieces:
@@ -248,7 +242,7 @@ impl PublicKey {
     /// each of those is encoded as big-endian bytes preceeded by four bytes
     /// representing their length.
     pub fn to_key_file(&self) -> String {
-        format!("{} {} {}", self.keytype, base64::encode(&self.data()), self.comment.clone().unwrap_or_default())
+        format!("{} {} {}", self.keytype(), base64::encode(&self.data()), self.comment.clone().unwrap_or_default())
     }
 
     /// size returns the size of the stored ssh key
@@ -259,7 +253,7 @@ impl PublicKey {
         match self.data {
             Data::Rsa{ref modulus,..} => modulus.len()*8,
             Data::Dsa{ref p,..} => p.len()*8,
-            Data::Ed25519{ref key} => 256, // ??
+            Data::Ed25519{..} => 256, // ??
         }
     }
 
