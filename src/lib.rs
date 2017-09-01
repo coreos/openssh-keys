@@ -173,6 +173,7 @@ impl PublicKey {
                 // public-key is the value that is actually generated in
                 // relation to the secret key
                 // see https://en.wikipedia.org/wiki/Digital_Signature_Algorithm
+                // and ssh-dss format in https://tools.ietf.org/html/rfc4253#section-6.6
                 // and https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L743
                 let p = reader.read_mpint()?;
                 let q = reader.read_mpint()?;
@@ -187,9 +188,13 @@ impl PublicKey {
             },
             SSH_ED25519 => {
                 // the data stored for an ed25519 is just the point on the curve
-                // or something
+                // for now the exact specification of the point on that curve is
+                // a mystery to me, instead of having to compute it, we just
+                // assume the key we got is correct and copy that verbatim. this
+                // also means we have to disallow arbitrary construction until
+                // furthur notice.
                 // see https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L772
-                let key = reader.read_mpint()?;
+                let key = reader.read_bytes()?;
                 Data::Ed25519 {
                     key: key.into(),
                 }
@@ -251,16 +256,6 @@ impl PublicKey {
         }
     }
 
-    /// get an ssh public key from an ed25519 point (probably)
-    pub fn from_ed25519(key: Vec<u8>) -> Self {
-        PublicKey {
-            data: Data::Ed25519 {
-                key: key,
-            },
-            comment: None,
-        }
-    }
-
     /// keytype returns the type of key in the format described by rfc4253
     /// The output will be ssh-{type} where type is [rsa,ed25519,ecdsa,dsa]
     pub fn keytype(&self) -> &'static str {
@@ -299,7 +294,7 @@ impl PublicKey {
                 writer.write_mpint(pub_key.clone());
             }
             Data::Ed25519{ref key} => {
-                writer.write_mpint(key.clone());
+                writer.write_bytes(key.clone());
             }
             Data::Ecdsa{ref curve, ref key} => {
                 writer.write_string(curve.curvetype());
