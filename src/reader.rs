@@ -27,12 +27,6 @@ impl<'a> Reader<'a> {
         Ok(BigEndian::read_u32(&cur[..4]))
     }
 
-    pub fn read_int(&mut self) -> Result<u32> {
-        let val = self.peek_int()?;
-        self.offset += 4;
-        Ok(val)
-    }
-
     pub fn read_string(&mut self) -> Result<&'a str> {
         ::std::str::from_utf8(self.read_bytes()?)
             .chain_err(|| ErrorKind::InvalidFormat)
