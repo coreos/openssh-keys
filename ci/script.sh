@@ -6,7 +6,7 @@ cross build --target $TARGET
 cross build --target $TARGET --release
 
 if [ ! -z $DISABLE_TESTS ]; then
-    return
+    exit 0
 fi
 
 cross test --target $TARGET
