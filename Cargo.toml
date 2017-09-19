@@ -11,6 +11,10 @@ keywords = ["ssh", "ssh-keys", "keys", "rsa"]
 license = "MIT OR Apache-2.0"
 exclude = ["fixtures/*"]
 
+[badges]
+appveyor = { repository = "sdemos/openssh-keys" }
+travis-ci = { repository = "sdemos/openssh-keys" }
+
 [dependencies]
 base64 = "0.6"
 byteorder = "1.1"

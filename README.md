@@ -1,4 +1,13 @@
-# ssh-keys
+# ssh-keys &emsp; [![Travis Status]][travis] [![AppVeyor Status]][appveyor] [![Latest Version]][crates.io] [![Docs Badge]][docs]
+
+[Travis Status]: https://api.travis-ci.org/sdemos/ssh-keys.svg?branch=master
+[travis]: https://travis-ci.org/sdemos/ssh-keys
+[AppVeyor Status]: https://ci.appveyor.com/api/projects/status/jxobgtenuy72e544?svg=true
+[appveyor]: https://ci.appveyor.com/project/sdemos/ssh-keys
+[Latest Version]: https://img.shields.io/crates/v/openssh-keys.svg
+[crates.io]: https://crates.io/crates/openssh-keys
+[Docs Badge]: https://docs.rs/openssh-keys/badge.svg
+[docs]: https://docs.rs/openssh-keys
 
 `ssh-keys` can parse, print, and fingerprint OpenSSH public keys in pure rust.
 
@@ -11,6 +20,9 @@
 
 It can construct RSA and DSA keys from their components using the `from_rsa` and
 `from_dsa` functions respectively.
+
+At some point in the future, this crate may add support for private ssh keys as
+well.
 
 ## License
 
