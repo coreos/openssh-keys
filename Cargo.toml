@@ -4,10 +4,10 @@ version = "0.1.0"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
 documentation = "https://docs.rs/openssh-keys"
-homepage = "https://github.com/sdemos/ssh-keys"
-repository = "https://github.com/sdemos/ssh-keys"
+homepage = "https://github.com/sdemos/openssh-keys"
+repository = "https://github.com/sdemos/openssh-keys"
 readme = "README.md"
-keywords = ["ssh", "ssh-keys", "keys", "rsa"]
+keywords = ["ssh", "ssh-keys", "keys", "rsa", "openssh"]
 license = "MIT OR Apache-2.0"
 exclude = ["fixtures/*"]
 
