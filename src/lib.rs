@@ -30,7 +30,7 @@
 
 extern crate base64;
 extern crate byteorder;
-extern crate crypto;
+extern crate sha2;
 #[macro_use]
 extern crate error_chain;
 
@@ -61,8 +61,7 @@ pub mod errors {
 
 use errors::*;
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+use sha2::{Sha256, Digest};
 
 use reader::Reader;
 use writer::Writer;
@@ -377,8 +376,7 @@ impl PublicKey {
         let data = self.data();
         let mut hasher = Sha256::new();
         hasher.input(&data);
-        let mut hashed: [u8; 32] = [0; 32];
-        hasher.result(&mut hashed);
+        let hashed = hasher.result();
         let mut fingerprint = base64::encode(&hashed);
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it

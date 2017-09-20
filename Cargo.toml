@@ -19,4 +19,4 @@ travis-ci = { repository = "sdemos/openssh-keys" }
 base64 = "0.6"
 byteorder = "1.1"
 error-chain = { version = "0.11", default-features = false }
-rust-crypto = "0.2"
+sha2 = "0.6"
