@@ -1,13 +1,32 @@
-//! ssh-keys
+//! A pure-Rust library to handle OpenSSH public keys.
 //!
-//! this library provides pure-rust parsing, manipulation, and some basic
-//! validation of ssh keys. it provides a struct for encapsulation of ssh keys
-//! in projects.
+//! This crate supports parsing, manipulation, and some basic validation of
+//! SSH keys. It provides a struct for encapsulation of SSH keys in projects.
 //!
-//! ssh-keys doesn't have the ability to generate ssh-keys. however, it does
-//! allow you to construct rsa and dsa keys from their components, so if you
+//! `openssh-keys` does not have the ability to generate SSH keys. However,
+//! it does allow to construct RSA and DSA keys from their components, so if you
 //! generate the keys with another library (say, rust-openssl), then you can
-//! output the ssh public keys with this library.
+//! output the SSH public keys with this library.
+//!
+//! # Example
+//!
+//! ```rust
+//! use std::{env, fs, io, path};
+//! use std::io::BufRead;
+//!
+//! fn inspect_rsa() {
+//!     let home = env::home_dir().unwrap_or(path::PathBuf::from("/home/core/"));
+//!     let pub_path = home.join(".ssh").join("id_rsa.pub");
+//!     println!("Inspecting '{}':", pub_path.to_string_lossy());
+//!     let file = fs::File::open(&pub_path).expect("unable to open RSA pubkey");
+//!     let reader = io::BufReader::new(file);
+//!
+//!     for (i, line) in reader.lines().enumerate() {
+//!         let line = line.expect(&format!("unable to read key at line {}", i + 1));
+//!         let pubkey = openssh_keys::PublicKey::parse(&line).expect("unable to parse RSA pubkey");
+//!         println!(" * Pubkey #{} -> {}", i + 1, pubkey.to_fingerprint_string());
+//!     }
+//! }
 
 extern crate base64;
 extern crate byteorder;
