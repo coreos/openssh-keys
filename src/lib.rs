@@ -8,7 +8,6 @@
 //! allow you to construct rsa and dsa keys from their components, so if you
 //! generate the keys with another library (say, rust-openssl), then you can
 //! output the ssh public keys with this library.
-#![allow(unused_doc_comment)]
 
 extern crate base64;
 extern crate byteorder;
