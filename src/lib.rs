@@ -154,9 +154,9 @@ impl fmt::Display for PublicKey {
 }
 
 impl PublicKey {
-    /// parse takes a string and reads from it an ssh public key
-    /// it uses the first part of the key to determine the keytype
-    /// the format it expects is described here https://tools.ietf.org/html/rfc4253#section-6.6
+    /// parse takes a string and reads from it an ssh public key. it uses the
+    /// first part of the key to determine the keytype. the format it expects is
+    /// described here https://tools.ietf.org/html/rfc4253#section-6.6
     ///
     /// You can parse and output ssh keys like this
     ///
@@ -340,21 +340,26 @@ impl PublicKey {
         self.comment = Some(comment.to_string());
     }
 
-    /// to_string returns a string representation of the ssh key
-    /// this string output is appropriate to use as a public key file
-    /// it adheres to the format described in https://tools.ietf.org/html/rfc4253#section-6.6
+    /// to_key_format returns a string representation of the ssh key. this string
+    /// output is appropriate to use as a public key file. it adheres to the
+    /// format described in https://tools.ietf.org/html/rfc4253#section-6.6
+    ///
     /// an ssh key consists of three pieces:
+    ///
     ///    ssh-keytype data comment
+    ///
     /// each of those is encoded as big-endian bytes preceeded by four bytes
     /// representing their length.
     pub fn to_key_file(&self) -> String {
         format!("{} {} {}", self.keytype(), base64::encode(&self.data()), self.comment.clone().unwrap_or_default())
     }
 
-    /// size returns the size of the stored ssh key
-    /// for rsa keys this is determined by the number of bits in the modulus
-    /// for dsa keys it's the number of bits in the prime p
+    /// size returns the size of the stored ssh key. for rsa keys this is
+    /// determined by the number of bits in the modulus. for dsa keys it's the
+    /// number of bits in the prime p.
+    ///
     /// see https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L261
+    /// for more details
     pub fn size(&self) -> usize {
         match self.data {
             Data::Rsa{ref modulus,..} => modulus.len()*8,
