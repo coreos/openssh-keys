@@ -28,6 +28,7 @@
 //!     }
 //! }
 
+extern crate core;
 extern crate base64;
 extern crate byteorder;
 extern crate sha2;
@@ -79,13 +80,12 @@ const NISTP_384: &'static str = "nistp384";
 const NISTP_521: &'static str = "nistp521";
 
 /// Curves for ECDSA
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum Curve {
     Nistp256,
     Nistp384,
     Nistp521,
 }
-
 
 impl Curve {
     /// get converts a curve name of the type in the format described in
@@ -119,7 +119,7 @@ impl fmt::Display for Curve {
 
 /// Data is the representation of the data section of an ssh public key. it is
 /// an enum with all the different supported key algorithms.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Data {
     Rsa {
         exponent: Vec<u8>,
@@ -141,7 +141,7 @@ pub enum Data {
 }
 
 /// PublicKey is the struct representation of an ssh public key.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 pub struct PublicKey {
     data: Data,
     comment: Option<String>,
@@ -150,6 +150,14 @@ pub struct PublicKey {
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_key_file())
+    }
+}
+
+/// Two public keys are equivalent if their data sections are equivalent,
+/// ignoring their comment section.
+impl core::cmp::PartialEq for PublicKey {
+    fn eq(&self, other: &PublicKey) -> bool {
+        self.data == other.data
     }
 }
 
