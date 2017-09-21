@@ -149,7 +149,7 @@ pub struct PublicKey {
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_key_file())
+        write!(f, "{}", self.to_key_format())
     }
 }
 
@@ -358,7 +358,7 @@ impl PublicKey {
     ///
     /// each of those is encoded as big-endian bytes preceeded by four bytes
     /// representing their length.
-    pub fn to_key_file(&self) -> String {
+    pub fn to_key_format(&self) -> String {
         format!("{} {} {}", self.keytype(), base64::encode(&self.data()), self.comment.clone().unwrap_or_default())
     }
 
