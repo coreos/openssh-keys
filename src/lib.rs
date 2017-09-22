@@ -161,6 +161,13 @@ impl core::cmp::PartialEq for PublicKey {
     }
 }
 
+impl std::str::FromStr for PublicKey {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        PublicKey::parse(s)
+    }
+}
+
 impl PublicKey {
     /// parse takes a string and reads from it an ssh public key. it uses the
     /// first part of the key to determine the keytype. the format it expects is
