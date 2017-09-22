@@ -68,6 +68,7 @@ use reader::Reader;
 use writer::Writer;
 
 use std::fmt;
+use std::io::{BufReader, BufRead, Read};
 
 const SSH_RSA: &'static str = "ssh-rsa";
 const SSH_DSA: &'static str = "ssh-dss";
@@ -277,6 +278,25 @@ impl PublicKey {
             data: data,
             comment: comment,
         })
+    }
+
+    /// read_keys reads a list of public keys from a reader. it returns an error
+    /// of it can't read or parse any of the public keys in the list.
+    pub fn read_keys<R>(r: R) -> Result<Vec<Self>>
+        where R: Read
+    {
+        let keybuf = BufReader::new(r);
+        // authorized_keys files are newline-separated lists of public keys
+        let mut keys = vec![];
+        for key in keybuf.lines() {
+            let key = key.chain_err(|| "failed to read public key")?;
+            // skip any empty lines and any comment lines (prefixed with '#')
+            if !key.is_empty() && !(key.trim().starts_with('#')) {
+                keys.push(PublicKey::parse(&key)
+                          .chain_err(|| "failed to parse public key")?);
+            }
+        }
+        Ok(keys)
     }
 
     /// get an ssh public key from rsa components
