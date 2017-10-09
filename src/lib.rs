@@ -141,7 +141,7 @@ pub enum Data {
     },
 }
 
-/// PublicKey is the struct representation of an ssh public key.
+/// `PublicKey` is the struct representation of an ssh public key.
 #[derive(Clone, Debug, Eq)]
 pub struct PublicKey {
     data: Data,
@@ -368,7 +368,7 @@ impl PublicKey {
                 writer.write_bytes(key.clone());
             }
         }
-        writer.to_vec()
+        writer.into_vec()
     }
 
     pub fn set_comment(&mut self, comment: &str) {
@@ -421,10 +421,9 @@ impl PublicKey {
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
-        match fingerprint.find('=') {
-            Some(l) => { fingerprint.split_off(l); },
-            None => {},
-        }
+        if let Some(l) = fingerprint.find('=') {
+            fingerprint.split_off(l);
+        };
         format!("SHA256:{}", fingerprint)
     }
 
@@ -441,7 +440,8 @@ impl PublicKey {
             Data::Ecdsa{..} => "ECDSA",
         };
 
-        format!("{} {} {} ({})", self.size(), self.fingerprint(), self.comment.clone().unwrap_or("no comment".to_string()), keytype)
+        let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
+        format!("{} {} {} ({})", self.size(), self.fingerprint(), comment, keytype)
     }
 }
 
