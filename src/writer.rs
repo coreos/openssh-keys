@@ -11,15 +11,14 @@ impl Writer {
         Writer {data: vec![]}
     }
 
-    pub fn to_vec(self) -> Vec<u8> {
+    pub fn into_vec(self) -> Vec<u8> {
         self.data
     }
 
     pub fn write_int(&mut self, val: u32) {
-        match self.data.write_u32::<BigEndian>(val) {
-            Err(..) => unreachable!(),
-            _ => {},
-        }
+        if let Err(..) = self.data.write_u32::<BigEndian>(val) {
+            unreachable!()
+        };
     }
 
     pub fn write_bytes(&mut self, mut buf: Vec<u8>) {
@@ -59,12 +58,12 @@ mod tests {
     #[test]
     fn writer_empty() {
         let w = Writer::new();
-        assert_eq!(w.to_vec().len(), 0);
+        assert_eq!(w.into_vec().len(), 0);
         let mut w = Writer::new();
         w.write_bytes(vec![]);
-        assert_eq!(w.to_vec().len(), 0);
+        assert_eq!(w.into_vec().len(), 0);
         let mut w = Writer::new();
         w.write_mpint(vec![]);
-        assert_eq!(w.to_vec().len(), 0);
+        assert_eq!(w.into_vec().len(), 0);
     }
 }
