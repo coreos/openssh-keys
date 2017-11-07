@@ -144,6 +144,7 @@ pub enum Data {
 /// `PublicKey` is the struct representation of an ssh public key.
 #[derive(Clone, Debug, Eq)]
 pub struct PublicKey {
+    options: Option<String>,
     data: Data,
     comment: Option<String>,
 }
@@ -170,9 +171,25 @@ impl std::str::FromStr for PublicKey {
 }
 
 impl PublicKey {
-    /// parse takes a string and reads from it an ssh public key. it uses the
-    /// first part of the key to determine the keytype. the format it expects is
-    /// described here https://tools.ietf.org/html/rfc4253#section-6.6
+    /// parse takes a string and parses it as a public key from an authorized
+    /// keys file. the format it expects is described here
+    /// https://tools.ietf.org/html/rfc4253#section-6.6 and here
+    /// https://man.openbsd.org/sshd#AUTHORIZED_KEYS_FILE_FORMAT
+    ///
+    /// sshd describes an additional, optional "options" field for public keys
+    /// in the authorized_keys file. This field allows for passing of options to
+    /// sshd that only apply to that particular public key. This means that a
+    /// public key in an authorized keys file is a strict superset of the public
+    /// key format described in rfc4253. Another superset of a public key is
+    /// what is present in the known_hosts file. This file has a hostname as the
+    /// first thing on the line. This parser treats the hostname the same as an
+    /// option field. When one of these things is found at the beginning of a
+    /// line, it is treated as a semi-opaque string that is carried with the
+    /// public key and reproduced when the key is printed. It is not entirely
+    /// opaque, since the parser needs to be aware of quoting semantics within
+    /// the option fields, since options surrounded by double quotes can contain
+    /// spaces, which are otherwise the main delimiter of the parts of a public
+    /// key.
     ///
     /// You can parse and output ssh keys like this
     ///
@@ -186,6 +203,45 @@ impl PublicKey {
     /// parse somewhat attempts to keep track of comments, but it doesn't fully
     /// comply with the rfc in that regard.
     pub fn parse(key: &str) -> Result<Self> {
+        // trim leading and trailing whitespace
+        let key = key.trim();
+        // try just parsing the keys straight up
+        PublicKey::try_key_parse(key).or_else(|e| {
+            // remove the preceeding string
+            let mut key_start = 0;
+            let mut escape = false;
+            let mut quote = false;
+            let mut marker = key.starts_with('@');
+            for (i, c) in key.chars().enumerate() {
+                if c == '\\' {
+                    escape = true;
+                    continue;
+                }
+                if escape {
+                    escape = false;
+                    continue;
+                }
+                if c == '"' {
+                    quote = !quote;
+                }
+                if !quote && (c == ' ' || c == '\t') {
+                    if marker {
+                        marker = false;
+                        continue;
+                    } else {
+                        key_start = i+1;
+                        break;
+                    }
+                }
+            }
+            let mut parsed = PublicKey::try_key_parse(&key[key_start..]).or(Err(e))?;
+            parsed.options = Some(key[..key_start-1].into());
+            Ok(parsed)
+        })
+    }
+
+    fn try_key_parse(key: &str) -> Result<Self> {
+        // then parse the key according to rfc4253
         let mut parts = key.split_whitespace();
         let keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
         let data = parts.next().ok_or(ErrorKind::InvalidFormat)?;
@@ -275,13 +331,15 @@ impl PublicKey {
         };
 
         Ok(PublicKey {
+            options: None,
             data: data,
             comment: comment,
         })
     }
 
-    /// read_keys reads a list of public keys from a reader. it returns an error
-    /// of it can't read or parse any of the public keys in the list.
+    /// read_keys takes a reader and parses it as an authorized_keys file. it
+    /// returns an error if it can't read or parse any of the public keys in the
+    /// list.
     pub fn read_keys<R>(r: R) -> Result<Vec<Self>>
         where R: Read
     {
@@ -302,6 +360,7 @@ impl PublicKey {
     /// get an ssh public key from rsa components
     pub fn from_rsa(e: Vec<u8>, n: Vec<u8>) -> Self {
         PublicKey {
+            options: None,
             data: Data::Rsa {
                 exponent: e,
                 modulus: n,
@@ -313,6 +372,7 @@ impl PublicKey {
     /// get an ssh public key from dsa components
     pub fn from_dsa(p: Vec<u8>, q: Vec<u8>, g: Vec<u8>, pkey: Vec<u8>) -> Self {
         PublicKey {
+            options: None,
             data: Data::Dsa {
                 p: p,
                 q: q,
@@ -379,14 +439,21 @@ impl PublicKey {
     /// output is appropriate to use as a public key file. it adheres to the
     /// format described in https://tools.ietf.org/html/rfc4253#section-6.6
     ///
-    /// an ssh key consists of three pieces:
+    /// an ssh key consists of four pieces:
     ///
-    ///    ssh-keytype data comment
+    ///    [options] ssh-keytype data comment
     ///
-    /// each of those is encoded as big-endian bytes preceeded by four bytes
-    /// representing their length.
+    /// the output of the data section is described in the documentation for the
+    /// data function. the options section is optional, and is not part of the
+    /// spec. rather, it is a field present in authorized_keys files or
+    /// known_hosts files.
     pub fn to_key_format(&self) -> String {
-        format!("{} {} {}", self.keytype(), base64::encode(&self.data()), self.comment.clone().unwrap_or_default())
+        let key = format!("{} {} {}", self.keytype(), base64::encode(&self.data()), self.comment.clone().unwrap_or_default());
+        if let Some(ref options) = self.options {
+            format!("{} {}", options, key)
+        } else {
+            key
+        }
     }
 
     /// size returns the size of the stored ssh key. for rsa keys this is
@@ -585,5 +652,61 @@ mod tests {
     fn ecdsa256_fingerprint_string() {
         let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
         assert_eq!("256 SHA256:BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs demos@siril (ECDSA)", key.to_fingerprint_string());
+    }
+
+    #[test]
+    fn option_parse() {
+        let key = PublicKey::parse("agent-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
+        assert_eq!(Some("agent-forwarding".into()), key.options);
+        assert_eq!("agent-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
+        let key = PublicKey::parse("from=\"*.sales.example.net,!pc.sales.example.net\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
+        assert_eq!(Some("from=\"*.sales.example.net,!pc.sales.example.net\"".into()), key.options);
+        assert_eq!("from=\"*.sales.example.net,!pc.sales.example.net\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
+        let key = PublicKey::parse("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
+        assert_eq!(Some("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\"".into()), key.options);
+        assert_eq!("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
+        let key = PublicKey::parse("command=\"echo \\\"holy shell escaping batman\\\"\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
+        assert_eq!(Some("command=\"echo \\\"holy shell escaping batman\\\"\"".into()), key.options);
+        assert_eq!("command=\"echo \\\"holy shell escaping batman\\\"\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
+        let key = PublicKey::parse("command=\"dump /home\",no-pty,no-port-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
+        assert_eq!(Some("command=\"dump /home\",no-pty,no-port-forwarding".into()), key.options);
+        assert_eq!("command=\"dump /home\",no-pty,no-port-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
+    }
+
+    #[test]
+    fn hostname_parse() {
+        let key = PublicKey::parse("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFHnC16I49ccjBo68lvN1+zpnAuTGbZjHFi2JRgPZK5o02UDCrFYCUhuS3oCh75+6YmVyReLZAyAM7S/5wjMzTY=").unwrap();
+        assert_eq!(Some("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129".into()), key.options);
+        assert_eq!("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFHnC16I49ccjBo68lvN1+zpnAuTGbZjHFi2JRgPZK5o02UDCrFYCUhuS3oCh75+6YmVyReLZAyAM7S/5wjMzTY=", key.to_string().trim());
+        let key = PublicKey::parse("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==").unwrap();
+        assert_eq!(Some("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()), key.options);
+        assert_eq!("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==", key.to_string().trim());
+        let key = PublicKey::parse("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==").unwrap();
+        assert_eq!(Some("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()), key.options);
+        assert_eq!("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==", key.to_string().trim());
+        let key = PublicKey::parse("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==").unwrap();
+        assert_eq!(Some("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()), key.options);
+        assert_eq!("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==", key.to_string().trim());
+    }
+
+    #[test]
+    fn read_keys() {
+        let authorized_keys = "# authorized keys
+
+command=\"echo \\\"holy shell escaping batman\\\"\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril
+agent-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril
+
+
+
+
+ssh-dss AAAAB3NzaC1kc3MAAACBAIkd9CkqldM2St8f53rfJT7kPgiA8leZaN7hdZd48hYJyKzVLoPdBMaGFuOwGjv0Im3JWqWAewANe0xeLceQL0rSFbM/mZV+1gc1nm1WmtVw4KJIlLXl3gS7NYfQ9Ith4wFnZd/xhRz9Q+MBsA1DgXew1zz4dLYI46KmFivJ7XDzAAAAFQC8z4VIhI4HlHTvB7FdwAfqWsvcOwAAAIBEqPIkW3HHDTSEhUhhV2AlIPNwI/bqaCXy2zYQ6iTT3oUh+N4xlRaBSvW+h2NC97U8cxd7Y0dXIbQKPzwNzRX1KA1F9WAuNzrx9KkpCg2TpqXShhp+Sseb+l6uJjthIYM6/0dvr9cBDMeExabPPgBo3Eii2NLbFSqIe86qav8hZAAAAIBk5AetZrG8varnzv1khkKh6Xq/nX9r1UgIOCQos2XOi2ErjlB9swYCzReo1RT7dalITVi7K9BtvJxbutQEOvN7JjJnPJs+M3OqRMMF+anXPdCWUIBxZUwctbkAD5joEjGDrNXHQEw9XixZ9p3wudbISnPFgZhS1sbS9Rlw5QogKg==
+";
+        let key1 = "command=\"echo \\\"holy shell escaping batman\\\"\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril";
+        let key2 = "agent-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril";
+        let key3 = "ssh-dss AAAAB3NzaC1kc3MAAACBAIkd9CkqldM2St8f53rfJT7kPgiA8leZaN7hdZd48hYJyKzVLoPdBMaGFuOwGjv0Im3JWqWAewANe0xeLceQL0rSFbM/mZV+1gc1nm1WmtVw4KJIlLXl3gS7NYfQ9Ith4wFnZd/xhRz9Q+MBsA1DgXew1zz4dLYI46KmFivJ7XDzAAAAFQC8z4VIhI4HlHTvB7FdwAfqWsvcOwAAAIBEqPIkW3HHDTSEhUhhV2AlIPNwI/bqaCXy2zYQ6iTT3oUh+N4xlRaBSvW+h2NC97U8cxd7Y0dXIbQKPzwNzRX1KA1F9WAuNzrx9KkpCg2TpqXShhp+Sseb+l6uJjthIYM6/0dvr9cBDMeExabPPgBo3Eii2NLbFSqIe86qav8hZAAAAIBk5AetZrG8varnzv1khkKh6Xq/nX9r1UgIOCQos2XOi2ErjlB9swYCzReo1RT7dalITVi7K9BtvJxbutQEOvN7JjJnPJs+M3OqRMMF+anXPdCWUIBxZUwctbkAD5joEjGDrNXHQEw9XixZ9p3wudbISnPFgZhS1sbS9Rlw5QogKg== ";
+        let keys = PublicKey::read_keys(authorized_keys.as_bytes()).unwrap();
+        assert_eq!(key1, keys[0].to_string());
+        assert_eq!(key2, keys[1].to_string());
+        assert_eq!(key3, keys[2].to_string());
     }
 }
