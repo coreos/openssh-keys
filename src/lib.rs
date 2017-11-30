@@ -31,7 +31,6 @@
 extern crate core;
 extern crate base64;
 extern crate byteorder;
-extern crate sha2;
 extern crate crypto;
 #[macro_use]
 extern crate error_chain;
@@ -63,10 +62,9 @@ pub mod errors {
 
 use errors::*;
 
-use sha2::{Sha256, Digest};
-
 use crypto::md5::Md5;
-use crypto::digest::Digest as MD5Digest;
+use crypto::sha2::Sha256;
+use crypto::digest::Digest;
 
 use reader::Reader;
 use writer::Writer;
@@ -485,10 +483,11 @@ impl PublicKey {
     /// defaults of a base64 encoded SHA256 hash.
     pub fn fingerprint(&self) -> String {
         let data = self.data();
-        let mut hasher = Sha256::new();
-        hasher.input(&data);
-        let hashed = hasher.result();
-        let mut fingerprint = base64::encode(&hashed);
+        let mut sh = Sha256::new();
+        sh.input(&data);
+        let mut output = [0; 32];
+        sh.result(&mut output);
+        let mut fingerprint = base64::encode(&output.as_ref());
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
