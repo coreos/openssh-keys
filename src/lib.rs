@@ -31,7 +31,8 @@
 extern crate core;
 extern crate base64;
 extern crate byteorder;
-extern crate crypto;
+extern crate sha2;
+extern crate md5;
 #[macro_use]
 extern crate error_chain;
 
@@ -62,9 +63,10 @@ pub mod errors {
 
 use errors::*;
 
-use crypto::md5::Md5;
-use crypto::sha2::Sha256;
-use crypto::digest::Digest;
+use sha2::{Sha256, Digest};
+
+use md5::Md5;
+use md5::Digest as MD5Digest;
 
 use reader::Reader;
 use writer::Writer;
@@ -483,11 +485,10 @@ impl PublicKey {
     /// defaults of a base64 encoded SHA256 hash.
     pub fn fingerprint(&self) -> String {
         let data = self.data();
-        let mut sh = Sha256::new();
-        sh.input(&data);
-        let mut output = [0; 32];
-        sh.result(&mut output);
-        let mut fingerprint = base64::encode(&output.as_ref());
+        let mut hasher = Sha256::new();
+        hasher.input(&data);
+        let hashed = hasher.result();
+        let mut fingerprint = base64::encode(&hashed);
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
@@ -514,18 +515,32 @@ impl PublicKey {
         format!("{} {} {} ({})", self.size(), self.fingerprint(), comment, keytype)
     }
 
-    /// to_fingerprint_m5_string prints out the fingerprint in the in hex format used
-    /// by `ssh-keygen -l -E md5 -f key` .
-    pub fn to_fingerprint_md5_string(&self) -> String {
-        let mut sh = Md5::new();
+    /// fingerprint_m5 returns a string representing the fingerprint of the ssh key
+    /// the format of the fingerprint is MD5, and the output looks like,
+    /// `fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d` .
+    pub fn fingerprint_md5(&self) -> String {
+        let mut sh = Md5::default();
         sh.input(&self.data());
-        let mut output = [0; 16];
-        sh.result(&mut output);
-        
-        let md5: Vec<String> = output.iter()
-            .map(|n| format!("{:02x}", n)).collect();
+
+        let md5: Vec<String> = sh.result().iter()
+          .map(|n| format!("{:02x}", n)).collect();
         md5.join(":")
-    }    
+    }
+
+    /// to_fingerprint_m5_string prints out the fingerprint in the in hex format used
+    /// by `ssh-keygen -l -E md5 -f key`, and the output looks like,
+    /// `2048 MD5:fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d demos@anduin (RSA)` .
+    pub fn to_fingerprint_md5_string(&self) -> String {
+        let keytype = match self.data {
+            Data::Rsa{..} => "RSA",
+            Data::Dsa{..} => "DSA",
+            Data::Ed25519{..} => "ED25519",
+            Data::Ecdsa{..} => "ECDSA",
+        };
+
+        let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
+        format!("{} MD5:{} {} ({})", self.size(), self.fingerprint_md5(), comment, keytype)
+    }
 }
 
 #[cfg(test)]
@@ -570,9 +585,15 @@ mod tests {
     }
 
     #[test]
+    fn rsa_fingerprint_md5() {
+        let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
+        assert_eq!("e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd", key.fingerprint_md5());
+    }
+
+    #[test]
     fn rsa_fingerprint_md5_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd", key.to_fingerprint_md5_string());
+        assert_eq!("2048 MD5:e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd demos@siril (RSA)", key.to_fingerprint_md5_string());
     }
 
     #[test]
