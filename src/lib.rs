@@ -495,7 +495,7 @@ impl PublicKey {
         if let Some(l) = fingerprint.find('=') {
             fingerprint.split_off(l);
         };
-        format!("SHA256:{}", fingerprint)
+        format!("{}", fingerprint)
     }
 
     /// to_fingerprint_string prints out the fingerprint in the same format used
@@ -512,7 +512,7 @@ impl PublicKey {
         };
 
         let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
-        format!("{} {} {} ({})", self.size(), self.fingerprint(), comment, keytype)
+        format!("{} SHA256:{} {} ({})", self.size(), self.fingerprint(), comment, keytype)
     }
 
     /// fingerprint_m5 returns a string representing the fingerprint of the ssh key
@@ -575,7 +575,7 @@ mod tests {
     #[test]
     fn rsa_fingerprint() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("SHA256:YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o", key.fingerprint());
+        assert_eq!("YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o", key.fingerprint());
     }
 
     #[test]
@@ -626,7 +626,7 @@ mod tests {
     #[test]
     fn dsa_fingerprint() {
         let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
-        assert_eq!("SHA256:/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4", key.fingerprint());
+        assert_eq!("/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4", key.fingerprint());
     }
 
     #[test]
@@ -657,7 +657,7 @@ mod tests {
     #[test]
     fn ed25519_fingerprint() {
         let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
-        assert_eq!("SHA256:A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI", key.fingerprint());
+        assert_eq!("A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI", key.fingerprint());
     }
 
     #[test]
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn ecdsa256_fingerprint() {
         let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
-        assert_eq!("SHA256:BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs", key.fingerprint());
+        assert_eq!("BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs", key.fingerprint());
     }
 
     #[test]
