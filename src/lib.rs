@@ -32,6 +32,7 @@ extern crate core;
 extern crate base64;
 extern crate byteorder;
 extern crate sha2;
+extern crate md5;
 #[macro_use]
 extern crate error_chain;
 
@@ -63,6 +64,9 @@ pub mod errors {
 use errors::*;
 
 use sha2::{Sha256, Digest};
+
+use md5::Md5;
+use md5::Digest as MD5Digest;
 
 use reader::Reader;
 use writer::Writer;
@@ -510,6 +514,33 @@ impl PublicKey {
         let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
         format!("{} {} {} ({})", self.size(), self.fingerprint(), comment, keytype)
     }
+
+    /// fingerprint_m5 returns a string representing the fingerprint of the ssh key
+    /// the format of the fingerprint is MD5, and the output looks like,
+    /// `fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d` .
+    pub fn fingerprint_md5(&self) -> String {
+        let mut sh = Md5::default();
+        sh.input(&self.data());
+
+        let md5: Vec<String> = sh.result().iter()
+          .map(|n| format!("{:02x}", n)).collect();
+        md5.join(":")
+    }
+
+    /// to_fingerprint_m5_string prints out the fingerprint in the in hex format used
+    /// by `ssh-keygen -l -E md5 -f key`, and the output looks like,
+    /// `2048 MD5:fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d demos@anduin (RSA)` .
+    pub fn to_fingerprint_md5_string(&self) -> String {
+        let keytype = match self.data {
+            Data::Rsa{..} => "RSA",
+            Data::Dsa{..} => "DSA",
+            Data::Ed25519{..} => "ED25519",
+            Data::Ecdsa{..} => "ECDSA",
+        };
+
+        let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
+        format!("{} MD5:{} {} ({})", self.size(), self.fingerprint_md5(), comment, keytype)
+    }
 }
 
 #[cfg(test)]
@@ -551,6 +582,18 @@ mod tests {
     fn rsa_fingerprint_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
         assert_eq!("2048 SHA256:YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o demos@siril (RSA)", key.to_fingerprint_string());
+    }
+
+    #[test]
+    fn rsa_fingerprint_md5() {
+        let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
+        assert_eq!("e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd", key.fingerprint_md5());
+    }
+
+    #[test]
+    fn rsa_fingerprint_md5_string() {
+        let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
+        assert_eq!("2048 MD5:e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd demos@siril (RSA)", key.to_fingerprint_md5_string());
     }
 
     #[test]
