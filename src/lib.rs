@@ -64,9 +64,7 @@ pub mod errors {
 use errors::*;
 
 use sha2::{Sha256, Digest};
-
 use md5::Md5;
-use md5::Digest as MD5Digest;
 
 use reader::Reader;
 use writer::Writer;
