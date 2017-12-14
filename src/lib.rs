@@ -72,15 +72,15 @@ use writer::Writer;
 use std::fmt;
 use std::io::{BufReader, BufRead, Read};
 
-const SSH_RSA: &'static str = "ssh-rsa";
-const SSH_DSA: &'static str = "ssh-dss";
-const SSH_ED25519: &'static str = "ssh-ed25519";
-const SSH_ECDSA_256: &'static str = "ecdsa-sha2-nistp256";
-const SSH_ECDSA_384: &'static str = "ecdsa-sha2-nistp384";
-const SSH_ECDSA_521: &'static str = "ecdsa-sha2-nistp521";
-const NISTP_256: &'static str = "nistp256";
-const NISTP_384: &'static str = "nistp384";
-const NISTP_521: &'static str = "nistp521";
+const SSH_RSA: &str = "ssh-rsa";
+const SSH_DSA: &str = "ssh-dss";
+const SSH_ED25519: &str = "ssh-ed25519";
+const SSH_ECDSA_256: &str = "ecdsa-sha2-nistp256";
+const SSH_ECDSA_384: &str = "ecdsa-sha2-nistp384";
+const SSH_ECDSA_521: &str = "ecdsa-sha2-nistp521";
+const NISTP_256: &str = "nistp256";
+const NISTP_384: &str = "nistp384";
+const NISTP_521: &str = "nistp521";
 
 /// Curves for ECDSA
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
