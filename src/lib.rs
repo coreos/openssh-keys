@@ -148,9 +148,9 @@ pub enum Data {
 /// `PublicKey` is the struct representation of an ssh public key.
 #[derive(Clone, Debug, Eq)]
 pub struct PublicKey {
-    options: Option<String>,
-    data: Data,
-    comment: Option<String>,
+    pub options: Option<String>,
+    pub data: Data,
+    pub comment: Option<String>,
 }
 
 impl fmt::Display for PublicKey {
