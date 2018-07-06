@@ -16,7 +16,7 @@ appveyor = { repository = "sdemos/openssh-keys" }
 travis-ci = { repository = "sdemos/openssh-keys" }
 
 [dependencies]
-base64 = "0.8"
+base64 = "0.9"
 byteorder = "1.1"
 error-chain = { version = "0.12", default-features = false }
 sha2 = "0.7"
