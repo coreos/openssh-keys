@@ -1,9 +1,9 @@
 # openssh-keys &emsp; [![Travis Status]][travis] [![AppVeyor Status]][appveyor] [![Latest Version]][crates.io] [![Docs Badge]][docs]
 
-[Travis Status]: https://api.travis-ci.org/sdemos/openssh-keys.svg?branch=master
-[travis]: https://travis-ci.org/sdemos/openssh-keys
+[Travis Status]: https://api.travis-ci.org/coreos/openssh-keys.svg?branch=master
+[travis]: https://travis-ci.org/coreos/openssh-keys
 [AppVeyor Status]: https://ci.appveyor.com/api/projects/status/kplw02ut4h9rbros?svg=true
-[appveyor]: https://ci.appveyor.com/project/sdemos/openssh-keys
+[appveyor]: https://ci.appveyor.com/project/coreos/openssh-keys
 [Latest Version]: https://img.shields.io/crates/v/openssh-keys.svg
 [crates.io]: https://crates.io/crates/openssh-keys
 [Docs Badge]: https://docs.rs/openssh-keys/badge.svg

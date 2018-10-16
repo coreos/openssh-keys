@@ -4,16 +4,16 @@ version = "0.3.0"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
 documentation = "https://docs.rs/openssh-keys"
-homepage = "https://github.com/sdemos/openssh-keys"
-repository = "https://github.com/sdemos/openssh-keys"
+homepage = "https://github.com/coreos/openssh-keys"
+repository = "https://github.com/coreos/openssh-keys"
 readme = "README.md"
 keywords = ["ssh", "ssh-keys", "keys", "rsa", "openssh"]
 license = "MIT OR Apache-2.0"
 exclude = ["fixtures/*", "ci/*", "appveyor.yml", ".travis.yml", "examples/*"]
 
 [badges]
-appveyor = { repository = "sdemos/openssh-keys" }
-travis-ci = { repository = "sdemos/openssh-keys" }
+appveyor = { repository = "coreos/openssh-keys" }
+travis-ci = { repository = "coreos/openssh-keys" }
 
 [dependencies]
 base64 = "0.9"
