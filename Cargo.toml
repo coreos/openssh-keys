@@ -9,10 +9,9 @@ repository = "https://github.com/coreos/openssh-keys"
 readme = "README.md"
 keywords = ["ssh", "ssh-keys", "keys", "rsa", "openssh"]
 license = "MIT OR Apache-2.0"
-exclude = ["fixtures/*", "ci/*", "appveyor.yml", ".travis.yml", "examples/*"]
+exclude = ["fixtures/*", ".travis.yml", "examples/*"]
 
 [badges]
-appveyor = { repository = "coreos/openssh-keys" }
 travis-ci = { repository = "coreos/openssh-keys" }
 
 [dependencies]
