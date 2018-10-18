@@ -15,11 +15,13 @@ exclude = ["fixtures/*", ".travis.yml", "examples/*"]
 travis-ci = { repository = "coreos/openssh-keys" }
 
 [dependencies]
+# Private dependencies.
 base64 = "0.9"
 byteorder = "1.1"
+md-5 = "0.8"
+sha2 = "0.8"
+# Public dependencies, exposed through library API.
 error-chain = { version = "0.12", default-features = false }
-sha2 = "0.7"
-md-5 = "0.7"
 
 [package.metadata.release]
 sign-commit = true
