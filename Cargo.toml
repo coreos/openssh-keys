@@ -1,6 +1,6 @@
 [package]
 name = "openssh-keys"
-version = "0.3.0"
+version = "0.4.0-alpha.0"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
 documentation = "https://docs.rs/openssh-keys"
@@ -20,3 +20,13 @@ byteorder = "1.1"
 error-chain = { version = "0.12", default-features = false }
 sha2 = "0.7"
 md-5 = "0.7"
+
+[package.metadata.release]
+sign-commit = true
+upload-doc = false
+disable-push = true
+disable-publish = true
+pre-release-commit-message = "cargo: openssh-keys release {{version}}"
+pro-release-commit-message = "cargo: version bump to {{version}}"
+tag-message = "openssh-keys v{{version}}"
+tag-prefix = "v"
