@@ -105,8 +105,8 @@ impl Curve {
 
     /// curvetype gets the curve name in the format described in
     /// https://tools.ietf.org/html/rfc5656#section-10
-    fn curvetype(&self) -> &'static str {
-        match *self {
+    fn curvetype(self) -> &'static str {
+        match self {
             Curve::Nistp256 => NISTP_256,
             Curve::Nistp384 => NISTP_384,
             Curve::Nistp521 => NISTP_521,
@@ -334,8 +334,8 @@ impl PublicKey {
 
         Ok(PublicKey {
             options: None,
-            data: data,
-            comment: comment,
+            data,
+            comment,
         })
     }
 
@@ -376,9 +376,9 @@ impl PublicKey {
         PublicKey {
             options: None,
             data: Data::Dsa {
-                p: p,
-                q: q,
-                g: g,
+                p,
+                q,
+                g,
                 pub_key: pkey,
             },
             comment: None,
@@ -493,7 +493,7 @@ impl PublicKey {
         if let Some(l) = fingerprint.find('=') {
             fingerprint.split_off(l);
         };
-        format!("{}", fingerprint)
+        fingerprint.to_string()
     }
 
     /// to_fingerprint_string prints out the fingerprint in the same format used

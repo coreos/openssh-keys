@@ -12,7 +12,7 @@ pub struct Reader<'a> {
 impl<'a> Reader<'a> {
     pub fn new(data: &[u8]) -> Reader {
         Reader {
-            data: data,
+            data,
             offset: 0,
         }
     }
