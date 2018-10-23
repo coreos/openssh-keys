@@ -1,6 +1,6 @@
 [package]
 name = "openssh-keys"
-version = "0.4.0-alpha.0"
+version = "0.4.0"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
 documentation = "https://docs.rs/openssh-keys"
