@@ -24,7 +24,7 @@ sha2 = "0.8"
 error-chain = { version = "0.12", default-features = false }
 
 [dev-dependencies]
-dirs = "1.0"
+dirs = "2.0"
 
 [package.metadata.release]
 sign-commit = true
