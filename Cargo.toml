@@ -16,7 +16,7 @@ travis-ci = { repository = "coreos/openssh-keys" }
 
 [dependencies]
 # Private dependencies.
-base64 = "0.10"
+base64 = "0.11"
 byteorder = "1.1"
 md-5 = "0.8"
 sha2 = "0.8"
