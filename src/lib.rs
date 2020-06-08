@@ -493,7 +493,7 @@ impl PublicKey {
         if let Some(l) = fingerprint.find('=') {
             fingerprint.split_off(l);
         };
-        fingerprint.to_string()
+        fingerprint
     }
 
     /// to_fingerprint_string prints out the fingerprint in the same format used
