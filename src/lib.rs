@@ -484,8 +484,8 @@ impl PublicKey {
     pub fn fingerprint(&self) -> String {
         let data = self.data();
         let mut hasher = Sha256::new();
-        hasher.input(&data);
-        let hashed = hasher.result();
+        hasher.update(&data);
+        let hashed = hasher.finalize();
         let mut fingerprint = base64::encode(&hashed);
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it
@@ -518,9 +518,9 @@ impl PublicKey {
     /// `fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d` .
     pub fn fingerprint_md5(&self) -> String {
         let mut sh = Md5::default();
-        sh.input(&self.data());
+        sh.update(&self.data());
 
-        let md5: Vec<String> = sh.result().iter()
+        let md5: Vec<String> = sh.finalize().iter()
           .map(|n| format!("{:02x}", n)).collect();
         md5.join(":")
     }
