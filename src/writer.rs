@@ -1,6 +1,6 @@
 //! This module provides a struct for writing bytes in the OpenSSH public key format.
 
-use byteorder::{WriteBytesExt, BigEndian};
+use byteorder::{BigEndian, WriteBytesExt};
 
 pub struct Writer {
     data: Vec<u8>,
@@ -8,7 +8,7 @@ pub struct Writer {
 
 impl Writer {
     pub fn new() -> Writer {
-        Writer {data: vec![]}
+        Writer { data: vec![] }
     }
 
     pub fn into_vec(self) -> Vec<u8> {
@@ -23,7 +23,7 @@ impl Writer {
 
     pub fn write_bytes(&mut self, mut buf: Vec<u8>) {
         if buf.is_empty() {
-            return
+            return;
         }
         // The first four bytes represent the length of the encoded data.
         self.write_int(buf.len() as u32);

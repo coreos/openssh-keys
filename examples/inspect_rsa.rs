@@ -1,8 +1,8 @@
 extern crate dirs;
 extern crate openssh_keys;
 
-use std::{fs, io, path};
 use std::io::BufRead;
+use std::{fs, io, path};
 
 fn main() {
     let home = dirs::home_dir().unwrap_or_else(|| path::PathBuf::from("/home/core/"));

@@ -11,10 +11,7 @@ pub struct Reader<'a> {
 
 impl<'a> Reader<'a> {
     pub fn new(data: &[u8]) -> Reader {
-        Reader {
-            data,
-            offset: 0,
-        }
+        Reader { data, offset: 0 }
     }
 
     pub fn peek_int(&mut self) -> Result<u32> {
@@ -26,8 +23,7 @@ impl<'a> Reader<'a> {
     }
 
     pub fn read_string(&mut self) -> Result<&'a str> {
-        ::std::str::from_utf8(self.read_bytes()?)
-            .chain_err(|| ErrorKind::InvalidFormat)
+        ::std::str::from_utf8(self.read_bytes()?).chain_err(|| ErrorKind::InvalidFormat)
     }
 
     pub fn read_mpint(&mut self) -> Result<&'a [u8]> {
@@ -48,10 +44,9 @@ impl<'a> Reader<'a> {
             return Err(ErrorKind::InvalidFormat.into());
         }
         self.offset += len + 4;
-        Ok(&cur[4..len+4])
+        Ok(&cur[4..len + 4])
     }
 }
-
 
 #[cfg(test)]
 mod tests {

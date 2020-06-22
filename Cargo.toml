@@ -27,11 +27,9 @@ error-chain = { version = "0.12", default-features = false }
 dirs = "3.0"
 
 [package.metadata.release]
-sign-commit = true
-upload-doc = false
-disable-push = true
 disable-publish = true
+disable-push = true
+post-release-commit-message = "cargo: development version bump"
 pre-release-commit-message = "cargo: openssh-keys release {{version}}"
-pro-release-commit-message = "cargo: version bump to {{version}}"
-tag-message = "openssh-keys v{{version}}"
-tag-prefix = "v"
+sign-commit = true
+tag-message = "openssh-keys {{version}}"
