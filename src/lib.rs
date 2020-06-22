@@ -28,11 +28,11 @@
 //!     }
 //! }
 
-extern crate core;
 extern crate base64;
 extern crate byteorder;
-extern crate sha2;
+extern crate core;
 extern crate md5;
+extern crate sha2;
 #[macro_use]
 extern crate error_chain;
 
@@ -63,14 +63,14 @@ pub mod errors {
 
 use errors::*;
 
-use sha2::{Sha256, Digest};
 use md5::Md5;
+use sha2::{Digest, Sha256};
 
 use reader::Reader;
 use writer::Writer;
 
 use std::fmt;
-use std::io::{BufReader, BufRead, Read};
+use std::io::{BufRead, BufReader, Read};
 
 const SSH_RSA: &str = "ssh-rsa";
 const SSH_DSA: &str = "ssh-dss";
@@ -99,7 +99,7 @@ impl Curve {
             NISTP_256 => Curve::Nistp256,
             NISTP_384 => Curve::Nistp384,
             NISTP_521 => Curve::Nistp521,
-            _ => return Err(ErrorKind::UnsupportedCurve(curve.to_string()).into())
+            _ => return Err(ErrorKind::UnsupportedCurve(curve.to_string()).into()),
         })
     }
 
@@ -231,13 +231,13 @@ impl PublicKey {
                         marker = false;
                         continue;
                     } else {
-                        key_start = i+1;
+                        key_start = i + 1;
                         break;
                     }
                 }
             }
             let mut parsed = PublicKey::try_key_parse(&key[key_start..]).or_else(|_| Err(e))?;
-            parsed.options = Some(key[..key_start-1].into());
+            parsed.options = Some(key[..key_start - 1].into());
             Ok(parsed)
         })
     }
@@ -249,10 +249,15 @@ impl PublicKey {
         let data = parts.next().ok_or(ErrorKind::InvalidFormat)?;
         // comment is not required. if we get an empty comment (because of a
         // trailing space) throw it out.
-        let comment = parts.next().and_then(|c| if c.is_empty() { None } else { Some(c.to_string()) });
+        let comment = parts.next().and_then(|c| {
+            if c.is_empty() {
+                None
+            } else {
+                Some(c.to_string())
+            }
+        });
 
-        let buf = base64::decode(data)
-            .chain_err(|| ErrorKind::InvalidFormat)?;
+        let buf = base64::decode(data).chain_err(|| ErrorKind::InvalidFormat)?;
         let mut reader = Reader::new(&buf);
         let data_keytype = reader.read_string()?;
         if keytype != data_keytype {
@@ -270,7 +275,7 @@ impl PublicKey {
                     exponent: e.into(),
                     modulus: n.into(),
                 }
-            },
+            }
             SSH_DSA => {
                 // the data stored for a dsa key is, in order
                 //    ssh-dsa p q g public-key
@@ -291,7 +296,7 @@ impl PublicKey {
                     g: g.into(),
                     pub_key: pub_key.into(),
                 }
-            },
+            }
             SSH_ED25519 => {
                 // the data stored for an ed25519 is just the point on the curve
                 // for now the exact specification of the point on that curve is
@@ -301,10 +306,8 @@ impl PublicKey {
                 // furthur notice.
                 // see https://github.com/openssh/openssh-portable/blob/master/sshkey.c#L772
                 let key = reader.read_bytes()?;
-                Data::Ed25519 {
-                    key: key.into(),
-                }
-            },
+                Data::Ed25519 { key: key.into() }
+            }
             SSH_ECDSA_256 | SSH_ECDSA_384 | SSH_ECDSA_521 => {
                 // ecdsa is of the form
                 //    ecdsa-sha2-[identifier] [identifier] [data]
@@ -328,7 +331,7 @@ impl PublicKey {
                     curve: Curve::get(curve)?,
                     key: key.into(),
                 }
-            },
+            }
             _ => return Err(ErrorKind::UnsupportedKeytype(keytype.into()).into()),
         };
 
@@ -343,7 +346,8 @@ impl PublicKey {
     /// returns an error if it can't read or parse any of the public keys in the
     /// list.
     pub fn read_keys<R>(r: R) -> Result<Vec<Self>>
-        where R: Read
+    where
+        R: Read,
     {
         let keybuf = BufReader::new(r);
         // authorized_keys files are newline-separated lists of public keys
@@ -352,8 +356,7 @@ impl PublicKey {
             let key = key.chain_err(|| "failed to read public key")?;
             // skip any empty lines and any comment lines (prefixed with '#')
             if !key.is_empty() && !(key.trim().starts_with('#')) {
-                keys.push(PublicKey::parse(&key)
-                          .chain_err(|| "failed to parse public key")?);
+                keys.push(PublicKey::parse(&key).chain_err(|| "failed to parse public key")?);
             }
         }
         Ok(keys)
@@ -389,10 +392,10 @@ impl PublicKey {
     /// The output will be ssh-{type} where type is [rsa,ed25519,ecdsa,dsa]
     pub fn keytype(&self) -> &'static str {
         match self.data {
-            Data::Rsa{..} => SSH_RSA,
-            Data::Dsa{..} => SSH_DSA,
-            Data::Ed25519{..} => SSH_ED25519,
-            Data::Ecdsa{ref curve,..} => match *curve {
+            Data::Rsa { .. } => SSH_RSA,
+            Data::Dsa { .. } => SSH_DSA,
+            Data::Ed25519 { .. } => SSH_ED25519,
+            Data::Ecdsa { ref curve, .. } => match *curve {
                 Curve::Nistp256 => SSH_ECDSA_256,
                 Curve::Nistp384 => SSH_ECDSA_384,
                 Curve::Nistp521 => SSH_ECDSA_521,
@@ -409,23 +412,31 @@ impl PublicKey {
         let mut writer = Writer::new();
         writer.write_string(self.keytype());
         match self.data {
-            Data::Rsa{ref exponent, ref modulus} => {
+            Data::Rsa {
+                ref exponent,
+                ref modulus,
+            } => {
                 // the data for an rsa key consists of three pieces:
                 //    ssh-rsa public-exponent modulus
                 // see ssh-rsa format in https://tools.ietf.org/html/rfc4253#section-6.6
                 writer.write_mpint(exponent.clone());
                 writer.write_mpint(modulus.clone());
             }
-            Data::Dsa{ref p, ref q, ref g, ref pub_key} => {
+            Data::Dsa {
+                ref p,
+                ref q,
+                ref g,
+                ref pub_key,
+            } => {
                 writer.write_mpint(p.clone());
                 writer.write_mpint(q.clone());
                 writer.write_mpint(g.clone());
                 writer.write_mpint(pub_key.clone());
             }
-            Data::Ed25519{ref key} => {
+            Data::Ed25519 { ref key } => {
                 writer.write_bytes(key.clone());
             }
-            Data::Ecdsa{ref curve, ref key} => {
+            Data::Ecdsa { ref curve, ref key } => {
                 writer.write_string(curve.curvetype());
                 writer.write_bytes(key.clone());
             }
@@ -450,7 +461,12 @@ impl PublicKey {
     /// spec. rather, it is a field present in authorized_keys files or
     /// known_hosts files.
     pub fn to_key_format(&self) -> String {
-        let key = format!("{} {} {}", self.keytype(), base64::encode(&self.data()), self.comment.clone().unwrap_or_default());
+        let key = format!(
+            "{} {} {}",
+            self.keytype(),
+            base64::encode(&self.data()),
+            self.comment.clone().unwrap_or_default()
+        );
         if let Some(ref options) = self.options {
             format!("{} {}", options, key)
         } else {
@@ -466,14 +482,14 @@ impl PublicKey {
     /// for more details
     pub fn size(&self) -> usize {
         match self.data {
-            Data::Rsa{ref modulus,..} => modulus.len()*8,
-            Data::Dsa{ref p,..} => p.len()*8,
-            Data::Ed25519{..} => 256, // ??
-            Data::Ecdsa{ref curve,..} => match *curve {
+            Data::Rsa { ref modulus, .. } => modulus.len() * 8,
+            Data::Dsa { ref p, .. } => p.len() * 8,
+            Data::Ed25519 { .. } => 256, // ??
+            Data::Ecdsa { ref curve, .. } => match *curve {
                 Curve::Nistp256 => 256,
                 Curve::Nistp384 => 384,
                 Curve::Nistp521 => 521,
-            }
+            },
         }
     }
 
@@ -503,14 +519,23 @@ impl PublicKey {
     /// hash.
     pub fn to_fingerprint_string(&self) -> String {
         let keytype = match self.data {
-            Data::Rsa{..} => "RSA",
-            Data::Dsa{..} => "DSA",
-            Data::Ed25519{..} => "ED25519",
-            Data::Ecdsa{..} => "ECDSA",
+            Data::Rsa { .. } => "RSA",
+            Data::Dsa { .. } => "DSA",
+            Data::Ed25519 { .. } => "ED25519",
+            Data::Ecdsa { .. } => "ECDSA",
         };
 
-        let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
-        format!("{} SHA256:{} {} ({})", self.size(), self.fingerprint(), comment, keytype)
+        let comment = self
+            .comment
+            .clone()
+            .unwrap_or_else(|| "no comment".to_string());
+        format!(
+            "{} SHA256:{} {} ({})",
+            self.size(),
+            self.fingerprint(),
+            comment,
+            keytype
+        )
     }
 
     /// fingerprint_m5 returns a string representing the fingerprint of the ssh key
@@ -520,8 +545,7 @@ impl PublicKey {
         let mut sh = Md5::default();
         sh.update(&self.data());
 
-        let md5: Vec<String> = sh.finalize().iter()
-          .map(|n| format!("{:02x}", n)).collect();
+        let md5: Vec<String> = sh.finalize().iter().map(|n| format!("{:02x}", n)).collect();
         md5.join(":")
     }
 
@@ -530,14 +554,23 @@ impl PublicKey {
     /// `2048 MD5:fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d demos@anduin (RSA)` .
     pub fn to_fingerprint_md5_string(&self) -> String {
         let keytype = match self.data {
-            Data::Rsa{..} => "RSA",
-            Data::Dsa{..} => "DSA",
-            Data::Ed25519{..} => "ED25519",
-            Data::Ecdsa{..} => "ECDSA",
+            Data::Rsa { .. } => "RSA",
+            Data::Dsa { .. } => "DSA",
+            Data::Ed25519 { .. } => "ED25519",
+            Data::Ecdsa { .. } => "ECDSA",
         };
 
-        let comment = self.comment.clone().unwrap_or_else(|| "no comment".to_string());
-        format!("{} MD5:{} {} ({})", self.size(), self.fingerprint_md5(), comment, keytype)
+        let comment = self
+            .comment
+            .clone()
+            .unwrap_or_else(|| "no comment".to_string());
+        format!(
+            "{} MD5:{} {} ({})",
+            self.size(),
+            self.fingerprint_md5(),
+            comment,
+            keytype
+        )
     }
 }
 
@@ -573,25 +606,37 @@ mod tests {
     #[test]
     fn rsa_fingerprint() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o", key.fingerprint());
+        assert_eq!(
+            "YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o",
+            key.fingerprint()
+        );
     }
 
     #[test]
     fn rsa_fingerprint_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("2048 SHA256:YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o demos@siril (RSA)", key.to_fingerprint_string());
+        assert_eq!(
+            "2048 SHA256:YTw/JyJmeAAle1/7zuZkPP0C73BQ+6XrFEt2/Wy++2o demos@siril (RSA)",
+            key.to_fingerprint_string()
+        );
     }
 
     #[test]
     fn rsa_fingerprint_md5() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd", key.fingerprint_md5());
+        assert_eq!(
+            "e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd",
+            key.fingerprint_md5()
+        );
     }
 
     #[test]
     fn rsa_fingerprint_md5_string() {
         let key = PublicKey::parse(TEST_RSA_KEY).unwrap();
-        assert_eq!("2048 MD5:e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd demos@siril (RSA)", key.to_fingerprint_md5_string());
+        assert_eq!(
+            "2048 MD5:e9:a1:5b:cd:a3:69:d2:d9:17:cb:09:3e:78:e1:0d:dd demos@siril (RSA)",
+            key.to_fingerprint_md5_string()
+        );
     }
 
     #[test]
@@ -624,13 +669,19 @@ mod tests {
     #[test]
     fn dsa_fingerprint() {
         let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
-        assert_eq!("/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4", key.fingerprint());
+        assert_eq!(
+            "/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4",
+            key.fingerprint()
+        );
     }
 
     #[test]
     fn dsa_fingerprint_string() {
         let key = PublicKey::parse(TEST_DSA_KEY).unwrap();
-        assert_eq!("1024 SHA256:/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4 demos@siril (DSA)", key.to_fingerprint_string());
+        assert_eq!(
+            "1024 SHA256:/Pyxrjot1Hs5PN2Dpg/4pK2wxxtP9Igc3sDTAWIEXT4 demos@siril (DSA)",
+            key.to_fingerprint_string()
+        );
     }
 
     #[test]
@@ -655,13 +706,19 @@ mod tests {
     #[test]
     fn ed25519_fingerprint() {
         let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
-        assert_eq!("A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI", key.fingerprint());
+        assert_eq!(
+            "A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI",
+            key.fingerprint()
+        );
     }
 
     #[test]
     fn ed25519_fingerprint_string() {
         let key = PublicKey::parse(TEST_ED25519_KEY).unwrap();
-        assert_eq!("256 SHA256:A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI demos@siril (ED25519)", key.to_fingerprint_string());
+        assert_eq!(
+            "256 SHA256:A/lHzXxsgbp11dcKKfSDyNQIdep7EQgZEoRYVDBfNdI demos@siril (ED25519)",
+            key.to_fingerprint_string()
+        );
     }
 
     #[test]
@@ -686,13 +743,19 @@ mod tests {
     #[test]
     fn ecdsa256_fingerprint() {
         let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
-        assert_eq!("BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs", key.fingerprint());
+        assert_eq!(
+            "BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs",
+            key.fingerprint()
+        );
     }
 
     #[test]
     fn ecdsa256_fingerprint_string() {
         let key = PublicKey::parse(TEST_ECDSA256_KEY).unwrap();
-        assert_eq!("256 SHA256:BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs demos@siril (ECDSA)", key.to_fingerprint_string());
+        assert_eq!(
+            "256 SHA256:BzS5YXMW/d2vFk8Oqh+nKmvKr8X/FTLBfJgDGLu5GAs demos@siril (ECDSA)",
+            key.to_fingerprint_string()
+        );
     }
 
     #[test]
@@ -701,32 +764,56 @@ mod tests {
         assert_eq!(Some("agent-forwarding".into()), key.options);
         assert_eq!("agent-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
         let key = PublicKey::parse("from=\"*.sales.example.net,!pc.sales.example.net\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
-        assert_eq!(Some("from=\"*.sales.example.net,!pc.sales.example.net\"".into()), key.options);
+        assert_eq!(
+            Some("from=\"*.sales.example.net,!pc.sales.example.net\"".into()),
+            key.options
+        );
         assert_eq!("from=\"*.sales.example.net,!pc.sales.example.net\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
         let key = PublicKey::parse("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
-        assert_eq!(Some("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\"".into()), key.options);
+        assert_eq!(
+            Some("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\"".into()),
+            key.options
+        );
         assert_eq!("permitopen=\"192.0.2.1:80\",permitopen=\"192.0.2.2:25\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
         let key = PublicKey::parse("command=\"echo \\\"holy shell escaping batman\\\"\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
-        assert_eq!(Some("command=\"echo \\\"holy shell escaping batman\\\"\"".into()), key.options);
+        assert_eq!(
+            Some("command=\"echo \\\"holy shell escaping batman\\\"\"".into()),
+            key.options
+        );
         assert_eq!("command=\"echo \\\"holy shell escaping batman\\\"\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
         let key = PublicKey::parse("command=\"dump /home\",no-pty,no-port-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril").unwrap();
-        assert_eq!(Some("command=\"dump /home\",no-pty,no-port-forwarding".into()), key.options);
+        assert_eq!(
+            Some("command=\"dump /home\",no-pty,no-port-forwarding".into()),
+            key.options
+        );
         assert_eq!("command=\"dump /home\",no-pty,no-port-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ demos@siril", key.to_string());
     }
 
     #[test]
     fn hostname_parse() {
         let key = PublicKey::parse("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFHnC16I49ccjBo68lvN1+zpnAuTGbZjHFi2JRgPZK5o02UDCrFYCUhuS3oCh75+6YmVyReLZAyAM7S/5wjMzTY=").unwrap();
-        assert_eq!(Some("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129".into()), key.options);
+        assert_eq!(
+            Some("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129".into()),
+            key.options
+        );
         assert_eq!("ec2-52-53-211-129.us-west-1.compute.amazonaws.com,52.53.211.129 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFHnC16I49ccjBo68lvN1+zpnAuTGbZjHFi2JRgPZK5o02UDCrFYCUhuS3oCh75+6YmVyReLZAyAM7S/5wjMzTY=", key.to_string().trim());
         let key = PublicKey::parse("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==").unwrap();
-        assert_eq!(Some("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()), key.options);
+        assert_eq!(
+            Some("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()),
+            key.options
+        );
         assert_eq!("[fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==", key.to_string().trim());
         let key = PublicKey::parse("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==").unwrap();
-        assert_eq!(Some("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()), key.options);
+        assert_eq!(
+            Some("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()),
+            key.options
+        );
         assert_eq!("@revoked [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==", key.to_string().trim());
         let key = PublicKey::parse("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==").unwrap();
-        assert_eq!(Some("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()), key.options);
+        assert_eq!(
+            Some("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090".into()),
+            key.options
+        );
         assert_eq!("@cert-authority [fangorn.csh.rit.edu]:9090,[129.21.50.131]:9090 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAopjUBQqif5ILeoMHjJ9wGlGs2eNHEv3+OAiiEDHCapNm3guNa+T/ZMtedaC/0P8bLBCXMiyNQU04N/IRyN3Mp/SGhtGJl1PDENXzPB9aoxsB2HHc8s8P7mxal1G4BtCT/fJM5XywEHWAcHkzW91iTK+ApAdqt6AHj35ogil9maFlUNKcXz2aW27hdbDtC0fautvWd9RIITHPq00rdvaHjRcc2msv8LddhBkStP8FrB39RPu9M+ikBkTwdQTSGcIBDYJgt3la2KMwmU1F81cq17wb21lPriBwr626lBiir/WdrBsoAsANeZfyzpAm8K4ssI3eu9eklxpEKdAdNRJbpQ==", key.to_string().trim());
     }
 
