@@ -1,7 +1,5 @@
-# openssh-keys &emsp; [![Travis Status]][travis] [![Latest Version]][crates.io] [![Docs Badge]][docs]
+# openssh-keys &emsp; [![Latest Version]][crates.io] [![Docs Badge]][docs]
 
-[Travis Status]: https://api.travis-ci.org/coreos/openssh-keys.svg?branch=master
-[travis]: https://travis-ci.org/coreos/openssh-keys
 [Latest Version]: https://img.shields.io/crates/v/openssh-keys.svg
 [crates.io]: https://crates.io/crates/openssh-keys
 [Docs Badge]: https://docs.rs/openssh-keys/badge.svg
