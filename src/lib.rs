@@ -507,7 +507,7 @@ impl PublicKey {
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
         if let Some(l) = fingerprint.find('=') {
-            fingerprint.split_off(l);
+            fingerprint.truncate(l);
         };
         fingerprint
     }
