@@ -236,7 +236,7 @@ impl PublicKey {
                     }
                 }
             }
-            let mut parsed = PublicKey::try_key_parse(&key[key_start..]).or_else(|_| Err(e))?;
+            let mut parsed = PublicKey::try_key_parse(&key[key_start..]).map_err(|_| e)?;
             parsed.options = Some(key[..key_start - 1].into());
             Ok(parsed)
         })
