@@ -28,11 +28,6 @@
 //!     }
 //! }
 
-extern crate base64;
-extern crate byteorder;
-extern crate core;
-extern crate md5;
-extern crate sha2;
 #[macro_use]
 extern crate error_chain;
 
@@ -61,13 +56,13 @@ pub mod errors {
     }
 }
 
-use errors::*;
+use crate::errors::*;
 
 use md5::Md5;
 use sha2::{Digest, Sha256};
 
-use reader::Reader;
-use writer::Writer;
+use crate::reader::Reader;
+use crate::writer::Writer;
 
 use std::fmt;
 use std::io::{BufRead, BufReader, Read};
@@ -236,7 +231,7 @@ impl PublicKey {
                     }
                 }
             }
-            let mut parsed = PublicKey::try_key_parse(&key[key_start..]).or_else(|_| Err(e))?;
+            let mut parsed = PublicKey::try_key_parse(&key[key_start..]).map_err(|_| e)?;
             parsed.options = Some(key[..key_start - 1].into());
             Ok(parsed)
         })
@@ -507,7 +502,7 @@ impl PublicKey {
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
         if let Some(l) = fingerprint.find('=') {
-            fingerprint.split_off(l);
+            fingerprint.truncate(l);
         };
         fingerprint
     }
