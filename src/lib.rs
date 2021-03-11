@@ -28,11 +28,6 @@
 //!     }
 //! }
 
-extern crate base64;
-extern crate byteorder;
-extern crate core;
-extern crate md5;
-extern crate sha2;
 #[macro_use]
 extern crate error_chain;
 
@@ -61,13 +56,13 @@ pub mod errors {
     }
 }
 
-use errors::*;
+use crate::errors::*;
 
 use md5::Md5;
 use sha2::{Digest, Sha256};
 
-use reader::Reader;
-use writer::Writer;
+use crate::reader::Reader;
+use crate::writer::Writer;
 
 use std::fmt;
 use std::io::{BufRead, BufReader, Read};

@@ -1,6 +1,3 @@
-extern crate dirs;
-extern crate openssh_keys;
-
 use std::io::BufRead;
 use std::{fs, io, path};
 

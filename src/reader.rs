@@ -1,6 +1,6 @@
 //! This module provides a struct for reading bytes in the OpenSSH public key format.
 
-use errors::*;
+use crate::errors::*;
 
 use byteorder::{BigEndian, ByteOrder};
 
