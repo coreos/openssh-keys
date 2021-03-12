@@ -1,6 +1,6 @@
 [package]
 name = "openssh-keys"
-version = "0.4.3-alpha.0"
+version = "0.5.0-alpha.0"
 edition = "2018"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
@@ -18,8 +18,9 @@ base64 = "0.13"
 byteorder = "1.1"
 md-5 = "0.9"
 sha2 = "0.9"
+thiserror = "1.0"
 # Public dependencies, exposed through library API.
-error-chain = { version = "0.12", default-features = false }
+# <none>
 
 [dev-dependencies]
 dirs = "3.0"
