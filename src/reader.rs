@@ -17,13 +17,13 @@ impl<'a> Reader<'a> {
     pub fn peek_int(&mut self) -> Result<u32> {
         let cur = &self.data[self.offset..];
         if cur.len() < 4 {
-            return Err(ErrorKind::InvalidFormat.into());
+            return Err(OpenSSHKeyError::InvalidFormat);
         }
         Ok(BigEndian::read_u32(&cur[..4]))
     }
 
     pub fn read_string(&mut self) -> Result<&'a str> {
-        ::std::str::from_utf8(self.read_bytes()?).chain_err(|| ErrorKind::InvalidFormat)
+        Ok(std::str::from_utf8(self.read_bytes()?)?)
     }
 
     pub fn read_mpint(&mut self) -> Result<&'a [u8]> {
@@ -41,7 +41,7 @@ impl<'a> Reader<'a> {
         let cur = &self.data[self.offset..];
         let len = self.peek_int()? as usize;
         if cur.len() < len + 4 {
-            return Err(ErrorKind::InvalidFormat.into());
+            return Err(OpenSSHKeyError::InvalidFormat);
         }
         self.offset += len + 4;
         Ok(&cur[4..len + 4])

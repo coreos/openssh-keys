@@ -28,31 +28,40 @@
 //!     }
 //! }
 
-#[macro_use]
-extern crate error_chain;
-
 mod reader;
 mod writer;
 
 pub mod errors {
-    error_chain! {
-        foreign_links {
-            Utf8(::std::str::Utf8Error);
-        }
-        errors {
-            InvalidFormat {
-                description("invalid key format")
-                    display("invalid key format")
-            }
-            UnsupportedKeytype(t: String) {
-                description("unsupported keytype")
-                    display("unsupported keytype: {}", t)
-            }
-            UnsupportedCurve(t: String) {
-                description("unsupported curve")
-                    display("unsupported curve: {}", t)
-            }
-        }
+    use thiserror::Error;
+
+    pub type Result<T> = std::result::Result<T, OpenSSHKeyError>;
+
+    #[derive(Error, Debug)]
+    pub enum OpenSSHKeyError {
+        #[error("I/O error")]
+        IO {
+            #[from]
+            source: std::io::Error,
+        },
+
+        #[error("invalid UTF-8")]
+        InvalidUtf8 {
+            #[from]
+            source: std::str::Utf8Error,
+        },
+
+        // keep base64::DecodeError out of the public API
+        #[error("invalid base64: {detail}")]
+        InvalidBase64 { detail: String },
+
+        #[error("invalid key format")]
+        InvalidFormat,
+
+        #[error("unsupported keytype: {keytype}")]
+        UnsupportedKeyType { keytype: String },
+
+        #[error("unsupported curve: {curve}")]
+        UnsupportedCurve { curve: String },
     }
 }
 
@@ -94,7 +103,11 @@ impl Curve {
             NISTP_256 => Curve::Nistp256,
             NISTP_384 => Curve::Nistp384,
             NISTP_521 => Curve::Nistp521,
-            _ => return Err(ErrorKind::UnsupportedCurve(curve.to_string()).into()),
+            _ => {
+                return Err(OpenSSHKeyError::UnsupportedCurve {
+                    curve: curve.to_string(),
+                })
+            }
         })
     }
 
@@ -161,7 +174,7 @@ impl core::cmp::PartialEq for PublicKey {
 }
 
 impl std::str::FromStr for PublicKey {
-    type Err = Error;
+    type Err = OpenSSHKeyError;
     fn from_str(s: &str) -> Result<Self> {
         PublicKey::parse(s)
     }
@@ -240,8 +253,8 @@ impl PublicKey {
     fn try_key_parse(key: &str) -> Result<Self> {
         // then parse the key according to rfc4253
         let mut parts = key.split_whitespace();
-        let keytype = parts.next().ok_or(ErrorKind::InvalidFormat)?;
-        let data = parts.next().ok_or(ErrorKind::InvalidFormat)?;
+        let keytype = parts.next().ok_or(OpenSSHKeyError::InvalidFormat)?;
+        let data = parts.next().ok_or(OpenSSHKeyError::InvalidFormat)?;
         // comment is not required. if we get an empty comment (because of a
         // trailing space) throw it out.
         let comment = parts.next().and_then(|c| {
@@ -252,11 +265,13 @@ impl PublicKey {
             }
         });
 
-        let buf = base64::decode(data).chain_err(|| ErrorKind::InvalidFormat)?;
+        let buf = base64::decode(data).map_err(|e| OpenSSHKeyError::InvalidBase64 {
+            detail: format!("{}", e),
+        })?;
         let mut reader = Reader::new(&buf);
         let data_keytype = reader.read_string()?;
         if keytype != data_keytype {
-            return Err(ErrorKind::InvalidFormat.into());
+            return Err(OpenSSHKeyError::InvalidFormat);
         }
 
         let data = match keytype {
@@ -327,7 +342,11 @@ impl PublicKey {
                     key: key.into(),
                 }
             }
-            _ => return Err(ErrorKind::UnsupportedKeytype(keytype.into()).into()),
+            _ => {
+                return Err(OpenSSHKeyError::UnsupportedKeyType {
+                    keytype: keytype.to_string(),
+                })
+            }
         };
 
         Ok(PublicKey {
@@ -348,10 +367,10 @@ impl PublicKey {
         // authorized_keys files are newline-separated lists of public keys
         let mut keys = vec![];
         for key in keybuf.lines() {
-            let key = key.chain_err(|| "failed to read public key")?;
+            let key = key?;
             // skip any empty lines and any comment lines (prefixed with '#')
             if !key.is_empty() && !(key.trim().starts_with('#')) {
-                keys.push(PublicKey::parse(&key).chain_err(|| "failed to parse public key")?);
+                keys.push(PublicKey::parse(&key)?);
             }
         }
         Ok(keys)
