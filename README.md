@@ -43,6 +43,10 @@ fn main() {
 
 Some more examples are available under [examples](examples).
 
+## Release process
+
+Releases can be performed by [creating a new release ticket][new-release-ticket] and following the steps in the checklist there.
+
 ## License
 
 Licensed under either of
@@ -58,3 +62,5 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+[new-release-ticket]: https://github.com/coreos/openssh-keys/issues/new?labels=release&template=release-checklist.md
