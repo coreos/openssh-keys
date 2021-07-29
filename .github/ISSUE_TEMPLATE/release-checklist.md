@@ -14,7 +14,7 @@ This guide requires:
  * `cargo-release` (suggested: `cargo install -f cargo-release`)
  * A verified account on crates.io
  * Write access to this GitHub project
- * Membership in the [Fedora CoreOS Crates Owners group](https://github.com/orgs/coreos/teams/fedora-coreos-crates-owners/members)
+ * Membership in the [Fedora CoreOS Crates Owners group](https://github.com/orgs/coreos/teams/fedora-coreos-crates-owners/members), which will give you upload access to crates.io
 
 ## Release checklist
 
