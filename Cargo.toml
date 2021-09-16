@@ -23,7 +23,7 @@ thiserror = "1.0"
 # <none>
 
 [dev-dependencies]
-dirs = "3.0"
+dirs = "4.0"
 
 [package.metadata.release]
 disable-publish = true
