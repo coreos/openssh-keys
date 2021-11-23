@@ -26,9 +26,8 @@ thiserror = "1.0"
 dirs = ">= 3.0, < 5.0"
 
 [package.metadata.release]
-disable-publish = true
-disable-push = true
-post-release-commit-message = "cargo: development version bump"
+publish = false
+push = false
 pre-release-commit-message = "cargo: openssh-keys release {{version}}"
 sign-commit = true
 sign-tag = true
