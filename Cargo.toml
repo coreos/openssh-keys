@@ -16,7 +16,7 @@ exclude = [".github", ".gitignore", "examples", "fixtures"]
 # Private dependencies.
 base64 = "0.13"
 byteorder = "1.1"
-md-5 = "0.9"
+md-5 = "0.10"
 sha2 = "0.9"
 thiserror = "1.0"
 # Public dependencies, exposed through library API.
