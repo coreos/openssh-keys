@@ -54,7 +54,7 @@ Push access to the upstream repository is required in order to publish the new t
 
 - publish this release on GitHub:
   - [ ] find the new tag in the [GitHub tag list](https://github.com/coreos/openssh-keys/tags), click the triple dots menu, and create a release for it
-  - [ ] write a short changelog (i.e. re-use the PR content)
+  - [ ] copy in the changelog from the release PR
   - [ ] publish release
 
 - clean up the local environment (optional, but recommended):
@@ -72,7 +72,7 @@ Push access to the upstream repository is required in order to publish the new t
     - update changelog
   - [ ] run `spectool -g -S rust-openssh-keys.spec`
   - [ ] run `kinit your_fas_account@FEDORAPROJECT.ORG`
-  - [ ] run `fedpkg new-sources <crate-name>`
+  - [ ] run `fedpkg new-sources $(spectool -S rust-openssh-keys.spec | sed 's:.*/::')`
   - [ ] PR the changes in [Fedora](https://src.fedoraproject.org/rpms/rust-openssh-keys)
   - [ ] once the PR merges to rawhide, merge rawhide into the other relevant branches (e.g. f35) then push those, for example:
     ```bash
