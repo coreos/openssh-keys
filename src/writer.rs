@@ -39,7 +39,7 @@ impl Writer {
         // If the number is positive then we are required to guarentee that the
         // most significant bit is set to zero if the first bit in the first
         // byte is going to be one.
-        if num.get(0).unwrap_or(&0) & 0x80 != 0 {
+        if num.first().unwrap_or(&0) & 0x80 != 0 {
             num.insert(0, 0);
         }
         // other than that it's just normal ssh encoding
