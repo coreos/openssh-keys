@@ -30,7 +30,7 @@ impl<'a> Reader<'a> {
         // mpints might have an extra byte of zeros at the start.
         // if there is, we can just ignore it, since the number is big-endian
         let bytes = self.read_bytes()?;
-        if bytes.get(0) == Some(&0) {
+        if bytes.first() == Some(&0) {
             Ok(&bytes[1..])
         } else {
             Ok(bytes)
