@@ -565,7 +565,7 @@ impl PublicKey {
         let mut hasher = Sha256::new();
         hasher.update(&data);
         let hashed = hasher.finalize();
-        let mut fingerprint = base64::encode(&hashed);
+        let mut fingerprint = base64::encode(hashed);
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
