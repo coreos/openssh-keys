@@ -1,7 +1,7 @@
 [package]
 name = "openssh-keys"
 version = "0.6.0"
-edition = "2018"
+edition = "2021"
 rust-version = "1.58.0"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
