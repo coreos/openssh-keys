@@ -67,6 +67,7 @@ pub mod errors {
 
 use crate::errors::*;
 
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use md5::Md5;
 use sha2::{Digest, Sha256};
 
@@ -276,9 +277,11 @@ impl PublicKey {
             }
         });
 
-        let buf = base64::decode(data).map_err(|e| OpenSSHKeyError::InvalidBase64 {
-            detail: format!("{}", e),
-        })?;
+        let buf = BASE64
+            .decode(data)
+            .map_err(|e| OpenSSHKeyError::InvalidBase64 {
+                detail: format!("{}", e),
+            })?;
         let mut reader = Reader::new(&buf);
         let data_keytype = reader.read_string()?;
         if keytype != data_keytype {
@@ -527,7 +530,7 @@ impl PublicKey {
         let key = format!(
             "{} {} {}",
             self.keytype(),
-            base64::encode(&self.data()),
+            BASE64.encode(&self.data()),
             self.comment.clone().unwrap_or_default()
         );
         if let Some(ref options) = self.options {
@@ -565,7 +568,7 @@ impl PublicKey {
         let mut hasher = Sha256::new();
         hasher.update(&data);
         let hashed = hasher.finalize();
-        let mut fingerprint = base64::encode(hashed);
+        let mut fingerprint = BASE64.encode(hashed);
         // trim padding characters off the end. I'm not clear on exactly what
         // this is doing but they do it here and the test fails without it
         // https://github.com/openssh/openssh-portable/blob/643c2ad82910691b2240551ea8b14472f60b5078/sshkey.c#L918
