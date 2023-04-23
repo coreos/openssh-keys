@@ -2,7 +2,7 @@ use std::io::BufRead;
 use std::{fs, io, path};
 
 fn main() {
-    let home = dirs::home_dir().unwrap_or_else(|| path::PathBuf::from("/home/core/"));
+    let home = home::home_dir().unwrap_or_else(|| path::PathBuf::from("/home/core/"));
     let pub_path = home.join(".ssh").join("id_rsa.pub");
     println!("Inspecting '{}':", pub_path.to_string_lossy());
     let file = fs::File::open(&pub_path).expect("unable to open RSA pubkey");
