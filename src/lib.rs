@@ -530,7 +530,7 @@ impl PublicKey {
         let key = format!(
             "{} {} {}",
             self.keytype(),
-            BASE64.encode(&self.data()),
+            BASE64.encode(self.data()),
             self.comment.clone().unwrap_or_default()
         );
         if let Some(ref options) = self.options {
