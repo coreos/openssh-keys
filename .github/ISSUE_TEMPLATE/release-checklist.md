@@ -27,13 +27,24 @@ Push access to the upstream repository is required in order to publish the new t
 
 :warning:: if `origin` is not the name of the locally configured remote that points to the upstream git repository (i.e. `git@github.com:coreos/openssh-keys.git`), be sure to assign the correct remote name to the `UPSTREAM_REMOTE` variable.
 
-- make sure the project is clean and prepare the environment:
+- prepare environment:
+  - [ ] `RELEASE_VER=x.y.z`
+  - [ ] `UPSTREAM_REMOTE=origin`
+  - [ ] `git checkout -b pre-release-${RELEASE_VER}`
+
+- write release notes:
+  - [ ] write release notes in `docs/release-notes.md`
+  - [ ] `git add docs/release-notes.md && git commit -m "docs/release-notes: update for release ${RELEASE_VER}"`
+
+- land the changes:
+  - [ ] PR the changes, get them reviewed, approved and merged
+  - [ ] if doing a branched release, also include a PR to merge the `docs/release-notes.md` changes into main
+
+- make sure the project is clean:
   - [ ] Make sure `cargo-release` is up to date: `cargo install cargo-release`
   - [ ] `cargo test --all-features`
   - [ ] `cargo clean`
   - [ ] `git clean -fd`
-  - [ ] `RELEASE_VER=x.y.z`
-  - [ ] `UPSTREAM_REMOTE=origin`
 
 - create release commit on a dedicated branch and tag it (the commit and tag will be signed with the GPG signing key you configured):
   - [ ] `git checkout -b release-${RELEASE_VER}`
@@ -43,7 +54,6 @@ Push access to the upstream repository is required in order to publish the new t
   - [ ] `git push ${UPSTREAM_REMOTE} release-${RELEASE_VER}`
   - [ ] open a web browser and create a PR for the branch above
   - [ ] make sure the resulting PR contains exactly one commit
-  - [ ] in the PR body, write a short changelog with relevant changes since last release
   - [ ] get the PR reviewed, approved and merged
 
 - publish the artifacts (tag and crate):
@@ -54,7 +64,7 @@ Push access to the upstream repository is required in order to publish the new t
 
 - publish this release on GitHub:
   - [ ] find the new tag in the [GitHub tag list](https://github.com/coreos/openssh-keys/tags), click the triple dots menu, and create a release for it
-  - [ ] copy in the changelog from the release PR
+  - [ ] copy in the changelog from the release notes doc
   - [ ] publish release
 
 - clean up the local environment (optional, but recommended):
@@ -74,13 +84,13 @@ Push access to the upstream repository is required in order to publish the new t
   - [ ] run `kinit your_fas_account@FEDORAPROJECT.ORG`
   - [ ] run `fedpkg new-sources $(spectool -S rust-openssh-keys.spec | sed 's:.*/::')`
   - [ ] PR the changes in [Fedora](https://src.fedoraproject.org/rpms/rust-openssh-keys)
-  - [ ] once the PR merges to rawhide, merge rawhide into the other relevant branches (e.g. f35) then push those, for example:
+  - [ ] once the PR merges to rawhide, merge rawhide into the other relevant branches (e.g. f38) then push those, for example:
     ```bash
     git checkout rawhide
     git pull --ff-only
-    git checkout f35
+    git checkout f38
     git merge --ff-only rawhide
-    git push origin f35
+    git push origin f38
     ```
   - [ ] on each of those branches run `fedpkg build`
   - [ ] once the builds have finished, submit them to [bodhi](https://bodhi.fedoraproject.org/updates/new), filling in:
