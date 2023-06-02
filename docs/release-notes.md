@@ -1,12 +1,19 @@
 # Release notes
 
-## Upcoming openssh-keys 0.6.1 (unreleased)
+## Upcoming openssh-keys 0.6.2 (unreleased)
 
 Changes:
 
-- Add release notes doc
+
+
+## openssh-keys 0.6.1 (2023-06-01)
+
+Changes:
+
 - Require Rust ≥ 1.58.0
 - Require `base64` ≥ 0.21
+- Switch example code from `dirs` dependency to `home`
+- Add release notes doc
 
 
 ## openssh-keys 0.6.0 (2022-11-18)
