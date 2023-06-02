@@ -9,7 +9,7 @@ fn main() {
     let reader = io::BufReader::new(file);
 
     for (i, line) in reader.lines().enumerate() {
-        let line = line.expect(&format!("unable to read key at line {}", i + 1));
+        let line = line.unwrap_or_else(|_| panic!("unable to read key at line {}", i + 1));
         let pubkey = openssh_keys::PublicKey::parse(&line).expect("unable to parse RSA pubkey");
         println!(" * Pubkey #{} -> {}", i + 1, pubkey.to_fingerprint_string());
     }
