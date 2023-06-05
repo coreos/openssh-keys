@@ -42,6 +42,7 @@ Push access to the upstream repository is required in order to publish the new t
 
 - make sure the project is clean:
   - [ ] Make sure `cargo-release` is up to date: `cargo install cargo-release`
+  - [ ] `git checkout main && git pull ${UPSTREAM_REMOTE} main`
   - [ ] `cargo test --all-features`
   - [ ] `cargo clean`
   - [ ] `git clean -fd`
@@ -71,8 +72,8 @@ Push access to the upstream repository is required in order to publish the new t
   - [ ] `cargo clean`
   - [ ] `git checkout main`
   - [ ] `git pull ${UPSTREAM_REMOTE} main`
-  - [ ] `git push ${UPSTREAM_REMOTE} :release-${RELEASE_VER}`
-  - [ ] `git branch -d release-${RELEASE_VER}`
+  - [ ] `git push ${UPSTREAM_REMOTE} :pre-release-${RELEASE_VER} :release-${RELEASE_VER}`
+  - [ ] `git branch -d pre-release-${RELEASE_VER} release-${RELEASE_VER}`
 
 - Fedora packaging:
   - [ ] update the `rust-openssh-keys` spec file in [Fedora](https://src.fedoraproject.org/rpms/rust-openssh-keys)
