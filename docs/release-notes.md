@@ -4,6 +4,7 @@
 
 Changes:
 
+- Require `md-5` 0.10, `sha2` 0.10 to avoid mismatched Rust Crypto dependencies
 
 
 ## openssh-keys 0.6.1 (2023-06-01)
