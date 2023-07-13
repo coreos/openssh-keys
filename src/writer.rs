@@ -16,7 +16,7 @@ impl Writer {
     }
 
     pub fn write_int(&mut self, val: u32) {
-        if let Err(..) = self.data.write_u32::<BigEndian>(val) {
+        if self.data.write_u32::<BigEndian>(val).is_err() {
             unreachable!()
         };
     }
