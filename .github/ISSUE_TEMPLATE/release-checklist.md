@@ -32,6 +32,9 @@ Push access to the upstream repository is required in order to publish the new t
   - [ ] `UPSTREAM_REMOTE=origin`
   - [ ] `git checkout -b pre-release-${RELEASE_VER}`
 
+- check `Cargo.toml` for unintended increases of lower version bounds:
+  - [ ] `git diff $(git describe --abbrev=0) Cargo.toml`
+
 - write release notes:
   - [ ] write release notes in `docs/release-notes.md`
   - [ ] `git add docs/release-notes.md && git commit -m "docs/release-notes: update for release ${RELEASE_VER}"`
