@@ -4,7 +4,7 @@
 
 Changes:
 
-
+ - Require Rust ≥ 1.75.0
 
 ## openssh-keys 0.6.2 (2023-06-27)
 
