@@ -4,7 +4,10 @@
 
 Changes:
 
- - Require Rust ≥ 1.75.0
+- Require Rust ≥ 1.75.0
+- Add Packit support for Fedora packaging
+
+
 
 ## openssh-keys 0.6.2 (2023-06-27)
 
