@@ -1,6 +1,9 @@
 # Release notes
 
-## Upcoming openssh-keys 0.6.3 (unreleased)
+## Upcoming openssh-keys 0.6.4 (unreleased)
+
+
+## openssh-keys 0.6.3 (2024-04-30)
 
 Changes:
 
