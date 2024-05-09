@@ -1,6 +1,13 @@
 # Release notes
 
-## Upcoming openssh-keys 0.6.4 (unreleased)
+## Upcoming openssh-keys 0.6.5 (unreleased)
+
+
+## Upcoming openssh-keys 0.6.4 (2024-05-08)
+
+Changes:
+
+- Add Packit support for Fedora packaging
 
 
 ## openssh-keys 0.6.3 (2024-04-30)
