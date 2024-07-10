@@ -3,7 +3,7 @@
 ## Upcoming openssh-keys 0.6.5 (unreleased)
 
 
-## Upcoming openssh-keys 0.6.4 (2024-05-08)
+## openssh-keys 0.6.4 (2024-07-10)
 
 Changes:
 
