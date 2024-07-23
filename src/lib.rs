@@ -616,7 +616,7 @@ impl PublicKey {
     /// `fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d` .
     pub fn fingerprint_md5(&self) -> String {
         let mut sh = Md5::default();
-        sh.update(&self.data());
+        sh.update(self.data());
 
         let md5: Vec<String> = sh.finalize().iter().map(|n| format!("{:02x}", n)).collect();
         md5.join(":")
