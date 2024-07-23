@@ -2,6 +2,10 @@
 
 ## Upcoming openssh-keys 0.6.5 (unreleased)
 
+Fixes:
+
+- Allow parsing comments containing whitespace
+
 
 ## openssh-keys 0.6.4 (2024-07-10)
 
