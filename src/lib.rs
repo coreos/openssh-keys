@@ -264,18 +264,23 @@ impl PublicKey {
 
     fn try_key_parse(key: &str) -> Result<Self> {
         // then parse the key according to rfc4253
-        let mut parts = key.split_whitespace();
-        let keytype = parts.next().ok_or(OpenSSHKeyError::InvalidFormat)?;
-        let data = parts.next().ok_or(OpenSSHKeyError::InvalidFormat)?;
-        // comment is not required. if we get an empty comment (because of a
-        // trailing space) throw it out.
-        let comment = parts.next().and_then(|c| {
-            if c.is_empty() {
-                None
-            } else {
-                Some(c.to_string())
-            }
-        });
+        let (keytype, remaining) = key
+            .split_once(char::is_whitespace)
+            .ok_or(OpenSSHKeyError::InvalidFormat)?;
+
+        let (data, comment) = remaining
+            .split_once(char::is_whitespace)
+            .unwrap_or((remaining, ""));
+
+        let comment = comment.trim();
+        if comment.contains('\n') {
+            return Err(OpenSSHKeyError::InvalidFormat);
+        }
+        let comment = if comment.is_empty() {
+            None
+        } else {
+            Some(comment.to_owned())
+        };
 
         let buf = BASE64
             .decode(data)
@@ -611,7 +616,7 @@ impl PublicKey {
     /// `fb:a0:5b:a0:21:01:47:33:3b:8d:9e:14:1a:4c:db:6d` .
     pub fn fingerprint_md5(&self) -> String {
         let mut sh = Md5::default();
-        sh.update(&self.data());
+        sh.update(self.data());
 
         let md5: Vec<String> = sh.finalize().iter().map(|n| format!("{:02x}", n)).collect();
         md5.join(":")
@@ -982,5 +987,69 @@ ssh-dss AAAAB3NzaC1kc3MAAACBAIkd9CkqldM2St8f53rfJT7kPgiA8leZaN7hdZd48hYJyKzVLoPd
         assert_eq!(key1, keys[0].to_string());
         assert_eq!(key2, keys[1].to_string());
         assert_eq!(key3, keys[2].to_string());
+    }
+
+    #[test]
+    fn comment_should_be_none_when_absent() {
+        let key =
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/";
+        let key = PublicKey::parse(key).unwrap();
+        assert!(key.comment.is_none());
+    }
+
+    #[test]
+    fn comment_should_be_none_when_empty_string() {
+        let key =
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/    ";
+        let key = PublicKey::parse(key).unwrap();
+        assert!(key.comment.is_none());
+    }
+
+    #[test]
+    fn comment_should_preserve_special_characters() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ !@#$%^&*()_+-={}|[]\\:\";'<>?,./";
+        let key = PublicKey::parse(key).unwrap();
+        assert_eq!(key.comment.unwrap(), "!@#$%^&*()_+-={}|[]\\:\";'<>?,./");
+    }
+
+    #[test]
+    fn comment_should_preserve_multiple_spaces() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ comment with multiple   spaces";
+        let key = PublicKey::parse(key).unwrap();
+        assert_eq!(key.comment.unwrap(), "comment with multiple   spaces");
+    }
+
+    #[test]
+    fn comment_should_remove_leading_and_trailing_spaces_while_keeping_body_intact() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/   leading and trailing   spaces are trimmed   ";
+        let key = PublicKey::parse(key).unwrap();
+        assert_eq!(
+            key.comment.unwrap(),
+            "leading and trailing   spaces are trimmed"
+        );
+    }
+
+    #[test]
+    fn comment_should_not_preserve_newlines() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ comment with\nnewlines";
+        let key = PublicKey::parse(key);
+        assert!(key.is_err());
+    }
+
+    #[test]
+    fn comment_should_preserve_mixed_whitespace() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ mixed white\t space";
+        let key = PublicKey::parse(key).unwrap();
+        assert_eq!(key.comment.unwrap(), "mixed white\t space");
+    }
+
+    #[test]
+    fn comment_should_preserve_unicode_characters() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhBr6++FQXB8kkgOMbdxBuyrHzuX5HkElswrN6DQoN/ comment with unicode: 中文, русский, عربى";
+        let key = PublicKey::parse(key).unwrap();
+        assert_eq!(
+            key.comment.unwrap(),
+            "comment with unicode: 中文, русский, عربى"
+        );
     }
 }
