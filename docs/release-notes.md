@@ -2,6 +2,10 @@
 
 ## Upcoming openssh-keys 0.6.5 (unreleased)
 
+Features:
+
+- support no_std contexts
+
 Fixes:
 
 - Allow parsing comments containing whitespace
