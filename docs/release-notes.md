@@ -4,6 +4,9 @@
 
 Changes:
 
+- support no_std contexts
+
+
 ## openssh-keys 0.6.5 (2025-10-28)
 
 Changes:

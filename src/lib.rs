@@ -27,6 +27,9 @@
 //!         println!(" * Pubkey #{} -> {}", i + 1, pubkey.to_fingerprint_string());
 //!     }
 //! }
+#![cfg_attr(not(any(feature = "std", test)), no_std)]
+
+extern crate alloc;
 
 mod reader;
 mod writer;
@@ -34,10 +37,13 @@ mod writer;
 pub mod errors {
     use thiserror::Error;
 
-    pub type Result<T> = std::result::Result<T, OpenSSHKeyError>;
+    use alloc::string::String;
+
+    pub type Result<T> = core::result::Result<T, OpenSSHKeyError>;
 
     #[derive(Error, Debug)]
     pub enum OpenSSHKeyError {
+        #[cfg(any(feature = "std", test, doc))]
         #[error("I/O error")]
         IO {
             #[from]
@@ -47,7 +53,7 @@ pub mod errors {
         #[error("invalid UTF-8")]
         InvalidUtf8 {
             #[from]
-            source: std::str::Utf8Error,
+            source: core::str::Utf8Error,
         },
 
         // keep base64::DecodeError out of the public API
@@ -74,8 +80,12 @@ use sha2::{Digest, Sha256};
 use crate::reader::Reader;
 use crate::writer::Writer;
 
-use std::fmt;
-use std::io::{BufRead, BufReader, Read};
+use core::fmt;
+
+use alloc::borrow::ToOwned;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 const SSH_RSA: &str = "ssh-rsa";
 const SSH_DSA: &str = "ssh-dss";
@@ -185,7 +195,7 @@ impl core::cmp::PartialEq for PublicKey {
     }
 }
 
-impl std::str::FromStr for PublicKey {
+impl core::str::FromStr for PublicKey {
     type Err = OpenSSHKeyError;
     fn from_str(s: &str) -> Result<Self> {
         PublicKey::parse(s)
@@ -398,13 +408,15 @@ impl PublicKey {
     /// read_keys takes a reader and parses it as an authorized_keys file. it
     /// returns an error if it can't read or parse any of the public keys in the
     /// list.
+    #[cfg(any(feature = "std", test, doc))]
     pub fn read_keys<R>(r: R) -> Result<Vec<Self>>
     where
-        R: Read,
+        R: std::io::Read,
     {
+        use std::io::{BufRead, BufReader};
         let keybuf = BufReader::new(r);
         // authorized_keys files are newline-separated lists of public keys
-        let mut keys = vec![];
+        let mut keys = Vec::new();
         for key in keybuf.lines() {
             let key = key?;
             // skip any empty lines and any comment lines (prefixed with '#')
