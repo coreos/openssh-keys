@@ -15,7 +15,7 @@ exclude = [".github", ".gitignore", "examples", "fixtures"]
 
 [dependencies]
 # Private dependencies.
-base64 = "0.21"
+base64 = "0.22"
 byteorder = "1.1"
 # Do not use a range on the crates md-5 or sha2. RustCrypto crate
 # versions cannot be mixed and matched. Doing so will cause hard
