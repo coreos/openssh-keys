@@ -5,6 +5,7 @@
 Fixes:
 
 - Allow parsing comments containing whitespace
+- Bump MSRV to 1.90.0
 
 
 ## openssh-keys 0.6.4 (2024-07-10)
