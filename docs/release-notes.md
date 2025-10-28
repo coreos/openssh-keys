@@ -1,8 +1,12 @@
 # Release notes
 
-## Upcoming openssh-keys 0.6.5 (unreleased)
+## Upcoming openssh-keys 0.6.6 (unreleased)
 
-Fixes:
+Changes:
+
+## openssh-keys 0.6.5 (2025-10-28)
+
+Changes:
 
 - Allow parsing comments containing whitespace
 - Bump MSRV to 1.90.0
