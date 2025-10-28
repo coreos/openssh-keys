@@ -10,7 +10,7 @@ pub struct Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-    pub fn new(data: &[u8]) -> Reader {
+    pub fn new(data: &[u8]) -> Reader<'_> {
         Reader { data, offset: 0 }
     }
 
