@@ -2,7 +2,7 @@
 name = "openssh-keys"
 version = "0.6.4"
 edition = "2021"
-rust-version = "1.75.0"
+rust-version = "1.90.0"
 authors = ["Stephen Demos <stephen@demos.zone>"]
 description = "read and write OpenSSH public keys"
 documentation = "https://docs.rs/openssh-keys"
