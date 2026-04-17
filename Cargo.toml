@@ -21,8 +21,8 @@ byteorder = "1.1"
 # versions cannot be mixed and matched. Doing so will cause hard
 # to understand build failures. Read about it at
 # https://github.com/coreos/openssh-keys/issues/89
-md-5 = "0.10"
-sha2 = "0.10"
+md-5 = "0.11"
+sha2 = "0.11"
 thiserror = "2.0"
 # Public dependencies, exposed through library API.
 # <none>
