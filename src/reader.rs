@@ -23,7 +23,7 @@ impl<'a> Reader<'a> {
     }
 
     pub fn read_string(&mut self) -> Result<&'a str> {
-        Ok(std::str::from_utf8(self.read_bytes()?)?)
+        Ok(core::str::from_utf8(self.read_bytes()?)?)
     }
 
     pub fn read_mpint(&mut self) -> Result<&'a [u8]> {
