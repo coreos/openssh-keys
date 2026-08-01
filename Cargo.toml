@@ -19,7 +19,7 @@ std = ["base64/std", "byteorder/std", "thiserror/std"]
 
 [dependencies]
 # Private dependencies.
-base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+base64 = { version = "0.23", default-features = false, features = ["alloc"] }
 byteorder = { version = "1.1", default-features = false }
 # Do not use a range on the crates md-5 or sha2. RustCrypto crate
 # versions cannot be mixed and matched. Doing so will cause hard
@@ -32,7 +32,7 @@ thiserror = { version = "2.0", default-features = false }
 # <none>
 
 [dev-dependencies]
-home = "=0.5.9"
+home = "=0.5.12"
 
 [package.metadata.release]
 publish = false
